@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend Dashboard Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+        }
+        .pass { background: #1e4620; color: #4ec9b0; }
+        .fail { background: #5a1d1d; color: #f48771; }
+        .warn { background: #5a4d1d; color: #dcdcaa; }
+        h2 { color: #4ec9b0; }
+        pre { background: #2d2d2d; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Frontend Dashboard Validation Test</h1>
+    <div id="results"></div>
+
+    <script>
+        const BASE_URL = 'http://localhost:3000';
+        const results = [];
+
+        function log(type, message, data = null) {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = `<strong>${type.toUpperCase()}:</strong> ${message}`;
+            if (data) {
+                div.innerHTML += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+            document.getElementById('results').appendChild(div);
+            results.push({ type, message, data });
+        }
+
+        async function testFrontendDataIntegrity() {
+            log('info', '=== FRONTEND DATA INTEGRITY TEST ===');
+
+            // Generate test data first
+            log('info', 'Generating test data...');
+            
+            // Clear existing data
+            await fetch(`${BASE_URL}/metrics`, { method: 'DELETE' });
+            
+            // Disable cache
+            await fetch(`${BASE_URL}/cache/disable`, { method: 'POST' });
+            
+            // Make requests without cache
+            for (let i = 0; i < 5; i++) {
+                await fetch(`${BASE_URL}/users`);
+                await fetch(`${BASE_URL}/products`);
+                await fetch(`${BASE_URL}/orders`);
+            }
+            
+            // Enable cache
+            await fetch(`${BASE_URL}/cache/enable`, { method: 'POST' });
+            
+            // Make requests with cache
+            for (let i = 0; i < 5; i++) {
+                await fetch(`${BASE_URL}/users`);
+                await fetch(`${BASE_URL}/products`);
+                await fetch(`${BASE_URL}/orders`);
+            }
+            
+            log('pass', 'Test data generated: 30 requests (15 cached, 15 non-cached)');
+            
+            // Wait for data to be processed
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Test 1: Stats API vs Dashboard
+            log('info', '\n--- Test 1: Stats Validation ---');
+            const statsResponse = await fetch(`${BASE_URL}/metrics/stats`);
+            const statsData = await statsResponse.json();
+            
+            if (statsData.success) {
+                log('pass', 'Stats API returned success', {
+                    totalRequests: statsData.data.totalRequests,
+                    averageResponseTime: statsData.data.averageResponseTime,
+                    slowRequestCount: statsData.data.slowRequestCount
+                });
+                
+                // Validate values are realistic
+                if (statsData.data.totalRequests > 0) {
+                    log('pass', 'Total requests > 0');
+                } else {
+                    log('fail', 'Total requests should be > 0');
+                }
+                
+                if (statsData.data.averageResponseTime > 0) {
+                    log('pass', `Average response time is realistic: ${statsData.data.averageResponseTime.toFixed(2)}ms`);
+                } else {
+                    log('fail', 'Average response time should be > 0');
+                }
+                
+                if (typeof statsData.data.slowRequestCount === 'number') {
+                    log('pass', `Slow request count is valid: ${statsData.data.slowRequestCount}`);
+                } else {
+                    log('fail', 'Slow request count should be a number');
+                }
+            } else {
+                log('fail', 'Stats API failed');
+            }
+            
+            // Test 2: Metrics API - Check for endpoint filtering
+            log('info', '\n--- Test 2: Metrics & Endpoint Filtering ---');
+            const metricsResponse = await fetch(`${BASE_URL}/metrics`);
+            const metricsData = await metricsResponse.json();
+            
+            if (metricsData.success) {
+                log('pass', `Metrics API returned ${metricsData.count} logs`);
+                
+                // Check for system endpoints that should be filtered
+                const systemEndpoints = ['/favicon.ico', '/metrics', '/analysis', '/health'];
+                const hasSystemEndpoints = metricsData.data.some(log => 
+                    systemEndpoints.includes(log.endpoint)
+                );
+                
+                if (hasSystemEndpoints) {
+                    log('warn', 'Metrics contain system endpoints - Dashboard should filter these out');
+                } else {
+                    log('pass', 'No system endpoints in metrics (or already filtered)');
+                }
+                
+                // Check for business endpoints
+                const businessEndpoints = ['/users', '/products', '/orders'];
+                const hasBusinessEndpoints = metricsData.data.some(log => 
+                    businessEndpoints.includes(log.endpoint)
+                );
+                
+                if (hasBusinessEndpoints) {
+                    log('pass', 'Metrics contain business endpoints');
+                } else {
+                    log('fail', 'Metrics should contain business endpoints');
+                }
+                
+                // Check log structure
+                if (metricsData.data.length > 0) {
+                    const firstLog = metricsData.data[0];
+                    const hasRequiredFields = 
+                        firstLog.hasOwnProperty('endpoint') &&
+                        firstLog.hasOwnProperty('responseTime') &&
+                        firstLog.hasOwnProperty('statusCode') &&
+                        firstLog.hasOwnProperty('timestamp') &&
+                        firstLog.hasOwnProperty('method') &&
+                        firstLog.hasOwnProperty('fromCache');
+                    
+                    if (hasRequiredFields) {
+                        log('pass', 'Log structure is correct', firstLog);
+                    } else {
+                        log('fail', 'Log structure is missing required fields', firstLog);
+                    }
+                }
+            }
+            
+            // Test 3: Slow APIs
+            log('info', '\n--- Test 3: Slow APIs Detection ---');
+            const slowResponse = await fetch(`${BASE_URL}/metrics/slow?threshold=500`);
+            const slowData = await slowResponse.json();
+            
+            if (slowData.success) {
+                log('pass', `Slow APIs endpoint returned ${slowData.count} slow requests`);
+                
+                if (slowData.data.length > 0) {
+                    // Verify all are actually slow
+                    const allSlow = slowData.data.every(log => log.responseTime > 500);
+                    if (allSlow) {
+                        log('pass', 'All slow APIs are above threshold');
+                    } else {
+                        log('fail', 'Some "slow" APIs are not above threshold');
+                    }
+                } else {
+                    log('warn', 'No slow APIs detected (OK if all requests are fast)');
+                }
+            }
+            
+            // Test 4: Analysis
+            log('info', '\n--- Test 4: Analysis Engine ---');
+            const analysisResponse = await fetch(`${BASE_URL}/analysis`);
+            const analysisData = await analysisResponse.json();
+            
+            if (analysisData.success) {
+                log('pass', `Analysis returned ${analysisData.count} insights`);
+                
+                if (analysisData.data.length > 0) {
+                    // Check insight structure
+                    const firstInsight = analysisData.data[0];
+                    const hasRequiredFields = 
+                        firstInsight.hasOwnProperty('endpoint') &&
+                        firstInsight.hasOwnProperty('issue') &&
+                        firstInsight.hasOwnProperty('severity') &&
+                        firstInsight.hasOwnProperty('suggestion');
+                    
+                    if (hasRequiredFields) {
+                        log('pass', 'Insight structure is correct', firstInsight);
+                    } else {
+                        log('fail', 'Insight structure is missing required fields', firstInsight);
+                    }
+                    
+                    // Check severity values
+                    const validSeverities = analysisData.data.every(i => 
+                        ['high', 'medium', 'low'].includes(i.severity)
+                    );
+                    if (validSeverities) {
+                        log('pass', 'All severity values are valid');
+                    } else {
+                        log('fail', 'Some severity values are invalid');
+                    }
+                } else {
+                    log('warn', 'No insights generated (OK if performance is good)');
+                }
+            }
+            
+            // Test 5: Cache Comparison
+            log('info', '\n--- Test 5: Cache Comparison ---');
+            const comparisonResponse = await fetch(`${BASE_URL}/metrics/comparison`);
+            const comparisonData = await comparisonResponse.json();
+            
+            if (comparisonData.success) {
+                const comp = comparisonData.data;
+                log('pass', 'Cache comparison API returned data', comp);
+                
+                // Check if we have meaningful data
+                if (comp.cachedRequests > 0 && comp.nonCachedRequests > 0) {
+                    log('pass', `Has both cached (${comp.cachedRequests}) and non-cached (${comp.nonCachedRequests}) data`);
+                    
+                    // Validate improvement calculation
+                    if (comp.avgResponseTimeWithCache > 0 && comp.avgResponseTimeWithoutCache > 0) {
+                        log('pass', 'Both cache metrics are positive numbers');
+                        
+                        // Check if improvement makes sense
+                        if (comp.improvementPercentage > 0 && comp.avgResponseTimeWithCache < comp.avgResponseTimeWithoutCache) {
+                            log('pass', `Cache shows ${comp.improvementPercentage.toFixed(1)}% improvement`);
+                        } else if (comp.improvementPercentage < 0) {
+                            log('warn', 'Cache shows negative improvement (cache might be slower)');
+                        } else {
+                            log('warn', 'No cache improvement detected');
+                        }
+                    } else {
+                        log('fail', 'Cache metrics should be positive numbers');
+                    }
+                } else {
+                    log('warn', 'Insufficient cache data for comparison');
+                }
+            }
+            
+            // Test 6: Dashboard should filter system endpoints
+            log('info', '\n--- Test 6: Dashboard Filtering Logic ---');
+            const ignoredEndpoints = ['/favicon.ico', '/metrics', '/analysis', '/health', '/metrics/stats', '/metrics/slow', '/metrics/comparison'];
+            log('pass', 'Dashboard should filter these endpoints:', ignoredEndpoints);
+            
+            // Test 7: Data consistency
+            log('info', '\n--- Test 7: Cross-API Data Consistency ---');
+            
+            // Compare metrics count with stats
+            if (metricsData.count === statsData.data.totalRequests) {
+                log('pass', 'Metrics count matches stats totalRequests');
+            } else {
+                log('warn', `Metrics count (${metricsData.count}) != stats totalRequests (${statsData.data.totalRequests})`);
+            }
+            
+            // Compare slow count
+            if (slowData.count <= metricsData.count) {
+                log('pass', 'Slow APIs count <= total metrics count');
+            } else {
+                log('fail', 'Slow APIs count should not exceed total metrics');
+            }
+            
+            // Summary
+            log('info', '\n=== TEST SUMMARY ===');
+            const passed = results.filter(r => r.type === 'pass').length;
+            const failed = results.filter(r => r.type === 'fail').length;
+            const warned = results.filter(r => r.type === 'warn').length;
+            
+            log('info', `✅ Passed: ${passed} | ❌ Failed: ${failed} | ⚠️  Warned: ${warned}`);
+            
+            if (failed === 0) {
+                log('pass', '🎉 ALL CRITICAL TESTS PASSED! Dashboard should display accurate data.');
+            } else {
+                log('fail', '⚠️  SOME TESTS FAILED. Review issues above.');
+            }
+        }
+
+        // Run tests on load
+        window.addEventListener('load', () => {
+            testFrontendDataIntegrity();
+        });
+    </script>
+</body>
+</html>

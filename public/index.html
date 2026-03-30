@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Performance Autotuner Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>🚀 API Performance Autotuner Dashboard</h1>
+                <p id="lastUpdate" style="color: #718096; font-size: 14px; margin-top: 5px;">Loading...</p>
+            </div>
+            <button id="refreshBtn" class="refresh-btn">🔄 Refresh Data</button>
+        </header>
+
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-content">
+                    <h3>Total Requests</h3>
+                    <p class="stat-value" id="totalRequests">-</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⚡</div>
+                <div class="stat-content">
+                    <h3>Avg Response Time</h3>
+                    <p class="stat-value" id="avgResponseTime">-</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🐌</div>
+                <div class="stat-content">
+                    <h3>Slow Requests</h3>
+                    <p class="stat-value" id="slowRequests">-</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💾</div>
+                <div class="stat-content">
+                    <h3>Cache Improvement</h3>
+                    <p class="stat-value" id="cacheImprovement">-</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="chart-section">
+            <div class="card">
+                <h2>📈 Endpoint Performance</h2>
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </section>
+
+        <div class="two-column">
+            <section class="card">
+                <h2>🐌 Slow APIs</h2>
+                <div id="slowApisList" class="list-container">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>💡 Analysis & Suggestions</h2>
+                <div id="analysisList" class="list-container">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+        </div>
+
+        <section class="card">
+            <h2>📊 Cache Performance Comparison</h2>
+            <div id="cacheComparison" class="comparison-container">
+                <p class="loading">Loading...</p>
+            </div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
