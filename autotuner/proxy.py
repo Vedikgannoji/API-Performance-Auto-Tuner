@@ -2,6 +2,9 @@
 import asyncio
 from http.cookiejar import CookieJar, DefaultCookiePolicy
 import json
+import hashlib
+import hmac
+import secrets
 from time import perf_counter
 
 import httpx
@@ -32,6 +35,29 @@ def filtered_headers(headers, *, request=False):
             if key.lower() not in excluded and not (request and key.lower().startswith(b'x-forwarded-'))]
 
 
+def cache_review_reason(method, headers, response):
+    """A conservative advisory screen, not shared-cache eligibility approval."""
+    names = {key.lower() for key, _ in headers}
+    if method != 'GET':
+        return 'method'
+    if names & {b'authorization', b'cookie'}:
+        return 'credentials'
+    if b'range' in names or any(name.startswith(b'if-') for name in names):
+        return 'conditional_or_range'
+    if names & {b'cache-control', b'pragma'}:
+        return 'request_directives'
+    if response.status_code != 200:
+        return 'response_status'
+    if 'set-cookie' in response.headers:
+        return 'set_cookie'
+    if 'cache-control' in response.headers or 'pragma' in response.headers:
+        return 'response_directives'
+    vary = {part.strip().lower() for part in response.headers.get('vary', '').split(',') if part.strip()}
+    if vary - {'accept', 'accept-encoding'}:
+        return 'unsupported_vary'
+    return 'review_required'
+
+
 async def json_response(send, status, data):
     body = json.dumps(data).encode()
     await send({'type': 'http.response.start', 'status': status,
@@ -43,6 +69,7 @@ class ObservationProxy:
     def __init__(self, config, session_id, *, transport=None):
         self.config, self.session_id = config, session_id
         self.base = httpx.URL(config.upstream)
+        self.reuse_salt = secrets.token_bytes(32)
         self.metrics = Metrics(capacity=config.metrics.raw_capacity)
         self.upstream_metrics = Metrics(capacity=config.metrics.raw_capacity)
         self.slots = asyncio.Semaphore(config.limits.upstream_concurrency)
@@ -81,6 +108,8 @@ class ObservationProxy:
         method = scope['method']
         stage = 'request'
         queued = None
+        queue_elapsed_ms = 0.0
+        review_reason, request_key = 'not_observed', None
         async def downstream(message):
             await asyncio.wait_for(send(message), self.config.limits.read_timeout_seconds)
         async def reject(code, detail):
@@ -120,7 +149,8 @@ class ObservationProxy:
             stage = 'queue'
             await asyncio.wait_for(self.slots.acquire(), self.config.limits.connect_timeout_seconds)
             acquired = True
-            self.counters['queue_ms'] += (perf_counter() - queued) * 1000
+            queue_elapsed_ms = (perf_counter() - queued) * 1000
+            self.counters['queue_ms'] += queue_elapsed_ms
             stage = 'request'
             body_deadline = perf_counter() + self.config.limits.read_timeout_seconds
             body = bytearray()
@@ -164,6 +194,13 @@ class ObservationProxy:
                 return await reject(502, 'Ambiguous upstream response framing')
             if response.status_code == 101 or response.headers.get('content-type', '').lower().split(';')[0].strip() == 'text/event-stream':
                 return await reject(502, 'Upstream returned an unsupported upgrade or event stream')
+            review_reason = cache_review_reason(method, headers, response)
+            if body and review_reason == 'review_required':
+                review_reason = 'get_body'
+            if review_reason == 'review_required':
+                fields = [target.raw_path] + [b'\x00'.join(values.get(name, [])) for name in (b'accept', b'accept-encoding')]
+                material = b''.join(len(field).to_bytes(8, 'big') + field for field in fields)
+                request_key = hmac.new(self.reuse_salt, material, hashlib.sha256).hexdigest()
             status = response.status_code
             response_started = True
             await downstream({'type': 'http.response.start', 'status': status,
@@ -189,7 +226,8 @@ class ObservationProxy:
                 raise IncompleteResponse('Response interrupted after headers') from None
             if stage == 'queue':
                 self.counters['overload_rejections'] += 1
-                self.counters['queue_ms'] += (perf_counter() - queued) * 1000
+                queue_elapsed_ms = (perf_counter() - queued) * 1000
+                self.counters['queue_ms'] += queue_elapsed_ms
             await reject(408 if stage == 'request' else 503 if stage == 'queue' else 504,
                          'Request body timed out' if stage == 'request' else
                          'Proxy admission timed out' if stage == 'queue' else 'Upstream timed out')
@@ -213,10 +251,11 @@ class ObservationProxy:
                 await response.aclose()
             if upstream_complete:
                 self.upstream_metrics.record(method, self.operation(scope['path'], method), response.status_code,
-                                             upstream_elapsed * 1000, 'BYPASS')
+                                             upstream_elapsed * 1000, 'BYPASS',
+                                             cache_review_reason=review_reason, request_key=request_key)
             if response_started and not completed:
                 self.counters['incomplete_responses'] += 1
             if completed:
                 self.counters['completed_requests'] += 1
                 self.metrics.record(method if method in METHODS else 'OTHER', self.operation(scope['path'], method), status,
-                                    (perf_counter() - start) * 1000, 'BYPASS')
+                                    (perf_counter() - start) * 1000, 'BYPASS', queue_ms=queue_elapsed_ms)

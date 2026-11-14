@@ -1,0 +1,93 @@
+{
+  "phase": 6,
+  "status": "ready_for_joint_review",
+  "verified_on": "2026-11-14",
+  "tests": {
+    "focused": 120,
+    "full_python": 212,
+    "new_insights_cases": 38,
+    "javascript": 9,
+    "focused_command": "python scripts/test_socketless.py tests/test_insights.py tests/test_proxy.py tests/test_cli.py tests/test_storage.py -o addopts=\"\" --tb=short",
+    "full_command": "python scripts/test_socketless.py --tb=short --junitxml=tmp/test-results.xml",
+    "javascript_command": "node --test tests/workflow.test.cjs"
+  },
+  "coverage": {
+    "covered_lines": 1458,
+    "num_statements": 1477,
+    "percent_covered": 98.10625986322988,
+    "percent_covered_display": "98",
+    "missing_lines": 19,
+    "excluded_lines": 7,
+    "percent_statements_covered": 98.71360866621531,
+    "percent_statements_covered_display": "99",
+    "num_branches": 424,
+    "num_partial_branches": 13,
+    "covered_branches": 407,
+    "missing_branches": 17,
+    "percent_branches_covered": 95.99056603773585,
+    "percent_branches_covered_display": "96"
+  },
+  "insights_coverage": {
+    "covered_lines": 93,
+    "num_statements": 93,
+    "percent_covered": 100.0,
+    "percent_covered_display": "100",
+    "missing_lines": 0,
+    "excluded_lines": 0,
+    "percent_statements_covered": 100.0,
+    "percent_statements_covered_display": "100",
+    "num_branches": 44,
+    "num_partial_branches": 0,
+    "covered_branches": 44,
+    "missing_branches": 0,
+    "percent_branches_covered": 100.0,
+    "percent_branches_covered_display": "100"
+  },
+  "packaging": {
+    "wheel": "api_performance_auto_tuner-2.0.0-py3-none-any.whl",
+    "sha256": "d4e3d6816ff122494ae30186691aca7ef12ca272364a19bb1ec2a8862fc0ab21",
+    "packaged_sources_match_workspace": true,
+    "isolated_install": "Passed version/insights-help/init/serve-check/doctor; installed core regression fixture and CLI with mocked local control response",
+    "dependencies": "Existing environment dependencies; not a fresh dependency installation"
+  },
+  "behavior": [
+    "Upstream mean and tail latency with minimum sample gates",
+    "Disjoint recent regression cohorts require relative and absolute thresholds",
+    "Proxy error and admission-pressure findings use their own timing boundaries",
+    "Same-request reuse uses per-session opaque fingerprints",
+    "Credential/private/unsupported response screening suppresses recommendations",
+    "Fingerprints excluded from SQLite and exported telemetry",
+    "Thresholds, sample deficits, quality and lifetime diagnostics are explained",
+    "No response-cache serving, auto replay or applied tuning"
+  ],
+  "limitations": [
+    "Socketless managed Windows runner; HTTPX mock streams and in-process ASGI integration",
+    "Normal-terminal live insights pending joint review",
+    "Insights reset at restart; persistent summary histograms cannot reconstruct chronological raw cohorts",
+    "No controlled overhead/RSS/cross-platform qualification or causal performance claim"
+  ],
+  "source_sha256": {
+    "autotuner/cache.py": "258666f564d89e514465bad746b90bb80781930306eac1934a185322502a8449",
+    "autotuner/cli.py": "f7537133849bb3fd96068a8f589f1a92f4f442e3c21d58c7624f5b8618b160de",
+    "autotuner/dashboard.html": "fb57e52468201182adc287c8b5261b989145c169a154daf0e6e0165383fb9c4e",
+    "autotuner/database.py": "99fea81ca0757a0f289533e6e98657bf818f971b2efcaf492c0d057bc7a042f4",
+    "autotuner/main.py": "169beaee737b8957b69e0b2e21cfe121f3a9707902ff79a9b0ff55616ef2c6b8",
+    "autotuner/metrics.py": "85df644ef01ce70ce7dcfcd60e51a483670787dbbd45e944179178c597f30e8f",
+    "autotuner/product_config.py": "4c0a3734d8e0089ba8a50997cb2b4fc6e98a35b815894712ee714b1cb1b9d2e0",
+    "autotuner/proxy.py": "85b235baf51f3d8327f813e555979b78746d0c37cd7ec2e5db6816e1522c648b",
+    "autotuner/reporting.py": "e21bec89da24c5a6468711e7cd5f240655f4be60e2ed02aca5a940860612ae78",
+    "autotuner/schemas.py": "0306b6c444cabb1e5379abb01aff603c144d188a19d9efdbc698cb8322fe8e29",
+    "autotuner/session.py": "4be7b6b4baf405e2748a60979286eb0c7e1de9b13ff0737635ed0f02018a6856",
+    "autotuner/storage.py": "3433706a1a6cae3054263f0daa9dd7ad0d75d2611326cd28331b6e09d7528a28",
+    "autotuner/workflow.js": "0ca385617f52c7124250b5b7a794e2eef0b84750941cd0715b52ba23676f61cd",
+    "autotuner/__init__.py": "3fabac76430f0af6f9a9822c1e131b9a2ee992851de26db345019af804653e3a",
+    "autotuner/__main__.py": "0dd072ac4488f65bf8c5864ce7a52efa1498fe3fe980353e07f148507de7c735",
+    "autotuner/core/cache.py": "c800383026e72c8813d59e69f97b4a253b6dd9ae74f8ce4e013d6178c4cdf70e",
+    "autotuner/core/contracts.py": "895a19767dcac0c76887a6360e01a1a83c47e4f0faf1f92f9f03716c123b6713",
+    "autotuner/core/engine.py": "f309d391663fdbe8d941117c42501d02c445ae81d865d3fe02952d4ada03c2c2",
+    "autotuner/core/insights.py": "a9e5b3e6bb9be007a652cfcca29b0a4e2718f1280b438635fbb8dee62ca4b34d",
+    "autotuner/core/metrics.py": "559e10821dce47fac2fd070acace9bd818de33c800e5f25b69cf85fed2e74eed",
+    "autotuner/core/monitoring.py": "1abee374d2ca3f40206b292fa9271e95c63f527550d6527b3106bcfaca413b0d",
+    "autotuner/core/__init__.py": "3cdcabf194fdc872bbe873acf07d95e33e7a8a1422964b73137e06d30b40ec49"
+  }
+}

@@ -1,9 +1,10 @@
-"""Phase 5 persistent observation session and loopback control endpoints."""
+"""Phase 6 advisory observation session and loopback control endpoints."""
 import uuid
 from urllib.parse import parse_qs
 
 from .proxy import ObservationProxy, json_response
 from .storage import TelemetryStorage, StorageUnavailable
+from .core.insights import analyze
 
 
 class ControlSession:
@@ -25,7 +26,7 @@ class ControlSession:
         self.storage.submit(boundary, row)
 
     def status(self):
-        return dict(schema_version=1, session_id=self.session_id, phase=5,
+        return dict(schema_version=1, session_id=self.session_id, phase=6,
                     mode=self.config.mode, effective_mode='observe', running=self.running,
                     upstream=self.config.upstream, listen=self.config.listen,
                     forwarding_enabled=True, cache_serving_enabled=False,
@@ -67,13 +68,18 @@ class ControlSession:
                     if path.endswith('/sessions'):
                         result = dict(schema_version=1, sessions=result)
                     return await json_response(send, 200, result)
-                if path == '/_autotuner/metrics':
+                if path in ('/_autotuner/metrics', '/_autotuner/insights'):
                     try:
-                        window = int(parse_qs(scope.get('query_string', b'').decode()).get('window', ['60'])[-1])
+                        window = int(parse_qs(scope.get('query_string', b'').decode()).get('window', ['300' if path.endswith('/insights') else '60'])[-1])
                         if not 1 <= window <= 3600:
                             raise ValueError()
                     except (ValueError, UnicodeError):
                         return await json_response(send, 400, {'detail': 'Window must be 1-3600 seconds'})
+                    if path.endswith('/insights'):
+                        result = analyze(self.config, self.proxy.metrics, self.proxy.upstream_metrics,
+                                         transport=self.proxy.counters, storage=self.storage.health(), window=window)
+                        result.update(session_id=self.session_id, config_digest=self.storage.digest, phase=6)
+                        return await json_response(send, 200, result)
                     result = self.proxy.metrics.snapshot(window)
                     result.update(schema_version=1, session_id=self.session_id,
                                   duration_boundary='proxy handling through downstream completion',

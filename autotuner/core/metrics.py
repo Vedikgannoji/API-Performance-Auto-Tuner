@@ -20,9 +20,9 @@ class Metrics:
         self.evicted = 0
         self.total_recorded = 0
 
-    def record(self, method, route, status, duration_ms, cache):
+    def record(self, method, route, status, duration_ms, cache, **evidence):
         row = dict(timestamp=self.clock(), method=method, route=route,
-                   status=status, duration_ms=duration_ms, cache=cache)
+                   status=status, duration_ms=duration_ms, cache=cache, **evidence)
         self.evicted += int(len(self.records) == self.records.maxlen)
         self.total_recorded += 1
         self.records.append(row)

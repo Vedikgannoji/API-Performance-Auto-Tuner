@@ -44,6 +44,8 @@ def parser():
     status = commands.add_parser('status', help='Query an already running local control session')
     endpoints = commands.add_parser('endpoints', help='Query observed route metrics')
     endpoints.add_argument('--window', type=int, default=60)
+    insights = commands.add_parser('insights', help='Explain recent bottlenecks and caching suitability without applying changes')
+    insights.add_argument('--window', type=int, default=300)
     sessions = commands.add_parser('sessions', help='List retained sessions, including after shutdown')
     report_command = commands.add_parser('report', help='Export retained endpoint telemetry')
     for sub in (sessions, report_command):
@@ -52,7 +54,7 @@ def parser():
     report_command.add_argument('--format', choices=['json', 'csv'], default='json')
     report_command.add_argument('--output', default=None)
     report_command.add_argument('--force', action='store_true')
-    for sub in (check, serve, doctor, status, endpoints, sessions, report_command):
+    for sub in (check, serve, doctor, status, endpoints, insights, sessions, report_command):
         sub.add_argument('--config', default=None)
         sub.add_argument('--upstream', default=None)
         sub.add_argument('--listen', default=None)
@@ -143,13 +145,13 @@ def main(argv=None):
                     print('Report saved.', file=sys.stderr)
                 else:
                     sys.stdout.write(content)
-        elif args.command in ('status', 'endpoints'):
+        elif args.command in ('status', 'endpoints', 'insights'):
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
             endpoint = '/_autotuner/status'
-            if args.command == 'endpoints':
+            if args.command in ('endpoints', 'insights'):
                 if not 1 <= args.window <= 3600:
                     raise ValueError('Invalid metrics window')
-                endpoint = '/_autotuner/metrics?window=' + str(args.window)
+                endpoint = ('/_autotuner/insights' if args.command == 'insights' else '/_autotuner/metrics') + '?window=' + str(args.window)
             with opener.open('http://' + config.listen + endpoint, timeout=2) as response:
                 try:
                     data = json.load(response)
@@ -157,8 +159,9 @@ def main(argv=None):
                     raise OSError('Invalid local session response') from exc
             if (not isinstance(data, dict) or data.get('schema_version') != 1 or
                 not isinstance(data.get('session_id'), str) or
-                (args.command == 'status' and data.get('phase') not in (3, 4, 5)) or
-                (args.command == 'endpoints' and not isinstance(data.get('routes'), dict))):
+                (args.command == 'status' and data.get('phase') not in (3, 4, 5, 6)) or
+                (args.command == 'endpoints' and not isinstance(data.get('routes'), dict)) or
+                (args.command == 'insights' and (not isinstance(data.get('findings'), list) or not isinstance(data.get('cache_suitability'), list) or data.get('recommendations_applied') is not False))):
                 raise OSError('Listener did not return a compatible control session')
             emit(data, args.json)
         else:
