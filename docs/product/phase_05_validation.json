@@ -1,0 +1,77 @@
+{
+  "phase": 5,
+  "status": "ready_for_joint_review",
+  "verified_on": "2026-11-14",
+  "tests": {
+    "focused": 118,
+    "full_python": 174,
+    "javascript": 9,
+    "new_storage_tests": 29,
+    "focused_command": "python scripts/test_socketless.py tests/test_storage.py tests/test_cli.py tests/test_product_config.py tests/test_metrics.py tests/test_proxy.py -o addopts=\"\" --tb=short",
+    "full_command": "python scripts/test_socketless.py --tb=short --junitxml=tmp/test-results.xml",
+    "javascript_command": "node --test tests/workflow.test.cjs"
+  },
+  "coverage": {
+    "covered_lines": 1323,
+    "num_statements": 1342,
+    "percent_covered": 97.88235294117646,
+    "percent_covered_display": "98",
+    "missing_lines": 19,
+    "excluded_lines": 7,
+    "percent_statements_covered": 98.58420268256334,
+    "percent_statements_covered_display": "99",
+    "num_branches": 358,
+    "num_partial_branches": 13,
+    "covered_branches": 341,
+    "missing_branches": 17,
+    "percent_branches_covered": 95.25139664804469,
+    "percent_branches_covered_display": "95"
+  },
+  "packaging": {
+    "wheel": "api_performance_auto_tuner-2.0.0-py3-none-any.whl",
+    "sha256": "e73588314730816a19ead57372566c1d3a7e17b6bffbd65787689e130b7499d8",
+    "packaged_sources_match_workspace": true,
+    "isolated_installed_cli": "version/init/doctor/serve-check/offline JSON and CSV reports/session history passed",
+    "dependency_environment": "Existing environment dependencies; not a fresh dependency installation"
+  },
+  "storage_evidence": [
+    "Exact weighted percentiles and aggregates",
+    "Combined raw observation cap",
+    "Bounded queue overflow and cancelled queries",
+    "Single-writer lease and real SQLite write lock",
+    "Retention, session cap and disk pressure",
+    "Privacy/redaction and config identity",
+    "Restart persistence and offline exports",
+    "Storage faults preserve successful proxy forwarding",
+    "Startup cancellation and shutdown checkpoint failure"
+  ],
+  "limitations": [
+    "Managed Windows sandbox; socketless event loop and in-process/mock transports",
+    "Normal-terminal live forwarding, Ctrl+C drain and report commands pending joint review",
+    "No overhead, RSS, sustained crash-recovery or cross-platform qualification",
+    "Generic response caching remains disabled"
+  ],
+  "source_sha256": {
+    "autotuner/cache.py": "258666f564d89e514465bad746b90bb80781930306eac1934a185322502a8449",
+    "autotuner/cli.py": "58bccbed99ef934af68e6c59f655a5f3f8b876d6932ad486cf25657ed0afb2c2",
+    "autotuner/dashboard.html": "fb57e52468201182adc287c8b5261b989145c169a154daf0e6e0165383fb9c4e",
+    "autotuner/database.py": "99fea81ca0757a0f289533e6e98657bf818f971b2efcaf492c0d057bc7a042f4",
+    "autotuner/main.py": "169beaee737b8957b69e0b2e21cfe121f3a9707902ff79a9b0ff55616ef2c6b8",
+    "autotuner/metrics.py": "85df644ef01ce70ce7dcfcd60e51a483670787dbbd45e944179178c597f30e8f",
+    "autotuner/product_config.py": "4c0a3734d8e0089ba8a50997cb2b4fc6e98a35b815894712ee714b1cb1b9d2e0",
+    "autotuner/proxy.py": "69c4fa01a9dd7a0f4585e8f3d3a59b6c5f816f913c7f473b2f5920d532117eea",
+    "autotuner/reporting.py": "e21bec89da24c5a6468711e7cd5f240655f4be60e2ed02aca5a940860612ae78",
+    "autotuner/schemas.py": "0306b6c444cabb1e5379abb01aff603c144d188a19d9efdbc698cb8322fe8e29",
+    "autotuner/session.py": "d99c65645e89e400cefed69df864015a2b640fc58fb1bfcd58305879d3d40206",
+    "autotuner/storage.py": "3433706a1a6cae3054263f0daa9dd7ad0d75d2611326cd28331b6e09d7528a28",
+    "autotuner/workflow.js": "0ca385617f52c7124250b5b7a794e2eef0b84750941cd0715b52ba23676f61cd",
+    "autotuner/__init__.py": "3fabac76430f0af6f9a9822c1e131b9a2ee992851de26db345019af804653e3a",
+    "autotuner/__main__.py": "0dd072ac4488f65bf8c5864ce7a52efa1498fe3fe980353e07f148507de7c735",
+    "autotuner/core/cache.py": "c800383026e72c8813d59e69f97b4a253b6dd9ae74f8ce4e013d6178c4cdf70e",
+    "autotuner/core/contracts.py": "895a19767dcac0c76887a6360e01a1a83c47e4f0faf1f92f9f03716c123b6713",
+    "autotuner/core/engine.py": "f309d391663fdbe8d941117c42501d02c445ae81d865d3fe02952d4ada03c2c2",
+    "autotuner/core/metrics.py": "af5cab738757f36073d67194d454d883264f5cfa5c6d4a7cd0f8d19c1d832a1e",
+    "autotuner/core/monitoring.py": "1abee374d2ca3f40206b292fa9271e95c63f527550d6527b3106bcfaca413b0d",
+    "autotuner/core/__init__.py": "3cdcabf194fdc872bbe873acf07d95e33e7a8a1422964b73137e06d30b40ec49"
+  }
+}

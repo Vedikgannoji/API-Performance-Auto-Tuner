@@ -1,4 +1,4 @@
-"""Version one product configuration contract; not yet wired to a proxy."""
+"""Version one product configuration contract."""
 import ipaddress
 import json
 from pathlib import Path
@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Positive = Annotated[int, Field(strict=True, gt=0)]
-Pattern = Annotated[str, Field(pattern=r'^/(?:[A-Za-z0-9_.~-]+|\*)(?:/(?:[A-Za-z0-9_.~-]+|\*))*$|^/$')]
+Pattern = Annotated[str, Field(max_length=1024, pattern=r'^/(?:[A-Za-z0-9_.~-]+|\*)(?:/(?:[A-Za-z0-9_.~-]+|\*))*$|^/$')]
 
 
 class Contract(BaseModel):
@@ -37,7 +37,16 @@ class Limits(Contract):
 class MetricsConfig(Contract):
     raw_capacity: Positive = 10000
     retention_days: Positive = 7
-    storage_max_bytes: Positive = 104857600
+    storage_max_bytes: Annotated[int, Field(strict=True, ge=131072)] = 104857600
+    storage_path: Annotated[str, Field(min_length=1, max_length=4096)] = ".autotuner/metrics.sqlite3"
+    writer_queue_capacity: Annotated[int, Field(strict=True, ge=1, le=10000)] = 1024
+
+    @field_validator("storage_path")
+    @classmethod
+    def local_storage(cls, value):
+        if "\x00" in value or value == ":memory:" or value.startswith("file:"):
+            raise ValueError("storage_path must name a local SQLite file")
+        return value
 
 
 class Mutation(Contract):
@@ -70,7 +79,7 @@ class RoutePolicy(Contract):
 
 
 class CacheRules(Contract):
-    routes: list[RoutePolicy] = Field(default_factory=list)
+    routes: list[RoutePolicy] = Field(default_factory=list, max_length=1000)
 
     @model_validator(mode='after')
     def unambiguous(self):

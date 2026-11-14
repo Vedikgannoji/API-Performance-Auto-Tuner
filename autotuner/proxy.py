@@ -218,5 +218,5 @@ class ObservationProxy:
                 self.counters['incomplete_responses'] += 1
             if completed:
                 self.counters['completed_requests'] += 1
-                self.metrics.record(method, self.operation(scope['path'], method), status,
+                self.metrics.record(method if method in METHODS else 'OTHER', self.operation(scope['path'], method), status,
                                     (perf_counter() - start) * 1000, 'BYPASS')

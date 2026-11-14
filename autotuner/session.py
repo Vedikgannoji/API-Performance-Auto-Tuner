@@ -1,8 +1,9 @@
-"""Phase 4 observation session and loopback control endpoints."""
+"""Phase 5 persistent observation session and loopback control endpoints."""
 import uuid
 from urllib.parse import parse_qs
 
 from .proxy import ObservationProxy, json_response
+from .storage import TelemetryStorage, StorageUnavailable
 
 
 class ControlSession:
@@ -11,13 +12,24 @@ class ControlSession:
         self.session_id = str(uuid.uuid4())
         self.running = False
         self.proxy = ObservationProxy(config, self.session_id, transport=transport)
+        self.storage = TelemetryStorage(config, self.session_id, transport_counters=self.proxy.counters)
+        self.proxy.metrics.observer = lambda row: self.observe("proxy", row)
+        self.proxy.upstream_metrics.observer = lambda row: self.observe("upstream", row)
+
+    def observe(self, boundary, row):
+        histories = (self.proxy.upstream_metrics, self.proxy.metrics)
+        while sum(len(m.records) for m in histories) > self.config.metrics.raw_capacity:
+            oldest = min((m for m in histories if m.records), key=lambda m: m.records[0]["timestamp"])
+            oldest.records.popleft()
+            oldest.evicted += 1
+        self.storage.submit(boundary, row)
 
     def status(self):
-        return dict(schema_version=1, session_id=self.session_id, phase=4,
+        return dict(schema_version=1, session_id=self.session_id, phase=5,
                     mode=self.config.mode, effective_mode='observe', running=self.running,
                     upstream=self.config.upstream, listen=self.config.listen,
                     forwarding_enabled=True, cache_serving_enabled=False,
-                    storage={'persistent': False, 'state': 'not_implemented'},
+                    storage=self.storage.health(),
                     limits=self.config.limits.model_dump(), transport=dict(self.proxy.counters))
 
     async def __call__(self, scope, receive, send):
@@ -25,11 +37,13 @@ class ControlSession:
             while True:
                 message = await receive()
                 if message['type'] == 'lifespan.startup':
+                    await self.storage.start()
                     self.running = True
                     await send({'type': 'lifespan.startup.complete'})
                 elif message['type'] == 'lifespan.shutdown':
                     self.running = False
                     await self.proxy.close()
+                    await self.storage.close()
                     await send({'type': 'lifespan.shutdown.complete'})
                     return
         elif scope['type'] == 'websocket':
@@ -41,6 +55,18 @@ class ControlSession:
                     return await json_response(send, 405, {'detail': 'GET required'})
                 if path in ('/_autotuner/status', '/_autotuner/health'):
                     return await json_response(send, 200, self.status())
+                if path in ('/_autotuner/report', '/_autotuner/sessions'):
+                    try:
+                        params = parse_qs(scope.get('query_string', b'').decode())
+                        session = params.get('session', [self.session_id])[-1]
+                        result = await self.storage.query('sessions' if path.endswith('/sessions') else 'report', session)
+                    except (ValueError, UnicodeError):
+                        return await json_response(send, 400, {'detail': 'Invalid report parameters'})
+                    except StorageUnavailable:
+                        return await json_response(send, 503, {'detail': 'Telemetry storage unavailable or busy'})
+                    if path.endswith('/sessions'):
+                        result = dict(schema_version=1, sessions=result)
+                    return await json_response(send, 200, result)
                 if path == '/_autotuner/metrics':
                     try:
                         window = int(parse_qs(scope.get('query_string', b'').decode()).get('window', ['60'])[-1])
@@ -51,7 +77,7 @@ class ControlSession:
                     result = self.proxy.metrics.snapshot(window)
                     result.update(schema_version=1, session_id=self.session_id,
                                   duration_boundary='proxy handling through downstream completion',
-                                  transport=dict(self.proxy.counters),
+                                  transport=dict(self.proxy.counters), storage=self.storage.health(),
                                   upstream=self.proxy.upstream_metrics.snapshot(window),
                                   upstream_duration_boundary='active upstream I/O excluding admission and downstream send waits')
                     return await json_response(send, 200, result)

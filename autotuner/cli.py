@@ -13,6 +13,8 @@ from pydantic import ValidationError
 
 from .product_config import ProductConfig
 from .session import ControlSession
+from .storage import config_identity, connect_readonly, history, report
+from .reporting import serialize_report
 
 VERSION = '2.0.0'
 
@@ -42,7 +44,15 @@ def parser():
     status = commands.add_parser('status', help='Query an already running local control session')
     endpoints = commands.add_parser('endpoints', help='Query observed route metrics')
     endpoints.add_argument('--window', type=int, default=60)
-    for sub in (check, serve, doctor, status, endpoints):
+    sessions = commands.add_parser('sessions', help='List retained sessions, including after shutdown')
+    report_command = commands.add_parser('report', help='Export retained endpoint telemetry')
+    for sub in (sessions, report_command):
+        sub.add_argument('--live', action='store_true', help='Flush and query the running proxy instead of reading disk')
+    report_command.add_argument('--session', default=None)
+    report_command.add_argument('--format', choices=['json', 'csv'], default='json')
+    report_command.add_argument('--output', default=None)
+    report_command.add_argument('--force', action='store_true')
+    for sub in (check, serve, doctor, status, endpoints, sessions, report_command):
         sub.add_argument('--config', default=None)
         sub.add_argument('--upstream', default=None)
         sub.add_argument('--listen', default=None)
@@ -65,7 +75,11 @@ def resolved_config(args):
             value = os.environ.get('AUTOTUNER_' + name.upper())
         if value is not None:
             data[name] = value
-    return ProductConfig.model_validate(data)
+    config = ProductConfig.model_validate(data)
+    storage_path = Path(config.metrics.storage_path)
+    if not storage_path.is_absolute():
+        config.metrics.storage_path = str((config_path(args).resolve().parent / storage_path).resolve())
+    return config
 
 
 def emit(value, as_json):
@@ -94,6 +108,41 @@ def main(argv=None):
                     pass
                 result['upstream_check'] = 'tcp_reachable_tls_not_tested'
             emit(result, args.json)
+        elif args.command in ('report', 'sessions'):
+            digest, _ = config_identity(config)
+            if args.live:
+                from urllib.parse import urlencode
+                endpoint = '/_autotuner/' + args.command
+                if args.command == 'report' and args.session:
+                    endpoint += '?' + urlencode({'session': args.session})
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+                with opener.open('http://' + config.listen + endpoint, timeout=10) as response:
+                    try:
+                        data = json.load(response)
+                    except ValueError:
+                        raise OSError('Invalid report response') from None
+                if not isinstance(data, dict) or data.get('schema_version') != 1:
+                    raise OSError('Incompatible telemetry report')
+                if args.command == 'report' and (data.get('config_digest') != digest or not isinstance(data.get('routes'), list) or
+                    not isinstance(data.get('sampling'), dict) or
+                    any(not isinstance(data.get(key), str) for key in ('tool_version', 'source_sha256', 'session_id'))):
+                    raise OSError('Report configuration mismatch')
+                if args.command == 'sessions' and not isinstance(data.get('sessions'), list):
+                    raise OSError('Invalid sessions response')
+            else:
+                from contextlib import closing
+                with closing(connect_readonly(config.metrics.storage_path)) as connection:
+                    data = report(connection, digest, args.session) if args.command == 'report' else dict(schema_version=1, sessions=history(connection, digest))
+            if args.command == 'sessions':
+                emit(data, args.json)
+            else:
+                content = serialize_report(data, args.format)
+                if args.output:
+                    with Path(args.output).open('w' if args.force else 'x', encoding='utf-8', newline='') as output:
+                        output.write(content)
+                    print('Report saved.', file=sys.stderr)
+                else:
+                    sys.stdout.write(content)
         elif args.command in ('status', 'endpoints'):
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
             endpoint = '/_autotuner/status'
@@ -108,7 +157,7 @@ def main(argv=None):
                     raise OSError('Invalid local session response') from exc
             if (not isinstance(data, dict) or data.get('schema_version') != 1 or
                 not isinstance(data.get('session_id'), str) or
-                (args.command == 'status' and data.get('phase') not in (3, 4)) or
+                (args.command == 'status' and data.get('phase') not in (3, 4, 5)) or
                 (args.command == 'endpoints' and not isinstance(data.get('routes'), dict))):
                 raise OSError('Listener did not return a compatible control session')
             emit(data, args.json)

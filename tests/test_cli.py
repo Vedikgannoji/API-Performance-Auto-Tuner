@@ -126,8 +126,8 @@ def test_endpoint_metrics_command(config, monkeypatch, capsys):
     assert cli.main(['endpoints', '--window', '0']) == 2
 
 
-def test_session_lifecycle_and_unsupported_forwarding():
-    app = ControlSession(ProductConfig(upstream='http://localhost:3000', mode='adaptive'), transport=httpx.MockTransport(lambda request: httpx.Response(200, content=b'ok')))
+def test_session_lifecycle_and_unsupported_forwarding(tmp_path):
+    app = ControlSession(ProductConfig(upstream='http://localhost:3000', mode='adaptive', metrics={'storage_path': str(tmp_path/'metrics.sqlite3')}), transport=httpx.MockTransport(lambda request: httpx.Response(200, content=b'ok')))
     async def scenario():
         messages = iter([{'type': 'lifespan.startup'}, {'type': 'lifespan.shutdown'}])
         sent = []

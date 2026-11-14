@@ -11,15 +11,23 @@ def percentile(values, fraction):
 
 
 class Metrics:
-    def __init__(self, capacity=10000, clock=time, *, store: ObservationStore | None = None):
+    def __init__(self, capacity=10000, clock=time, *, store: ObservationStore | None = None, observer=None):
         self.records = store if store is not None else deque(maxlen=capacity)
         if self.records.maxlen is None or self.records.maxlen <= 0:
             raise ValueError('Observation storage must have a positive finite capacity')
         self.clock = clock
+        self.observer = observer
+        self.evicted = 0
+        self.total_recorded = 0
 
     def record(self, method, route, status, duration_ms, cache):
-        self.records.append(dict(timestamp=self.clock(), method=method, route=route,
-                                 status=status, duration_ms=duration_ms, cache=cache))
+        row = dict(timestamp=self.clock(), method=method, route=route,
+                   status=status, duration_ms=duration_ms, cache=cache)
+        self.evicted += int(len(self.records) == self.records.maxlen)
+        self.total_recorded += 1
+        self.records.append(row)
+        if self.observer is not None:
+            self.observer(row)
 
     def snapshot(self, window=60):
         rows = [r for r in self.records if r['timestamp'] >= self.clock() - window]
@@ -36,7 +44,9 @@ class Metrics:
                         p50_ms=percentile(values, .5), p95_ms=percentile(values, .95),
                         p99_ms=percentile(values, .99), cache_hits=sum(r['cache'] == 'HIT' for r in items))
         return dict(window_seconds=window, retained_samples=len(self.records),
-                    capacity=self.records.maxlen, summary=summarize(rows),
+                    capacity=self.records.maxlen, total_recorded=self.total_recorded,
+                    evicted_samples=self.evicted, window_may_be_incomplete=bool(self.evicted),
+                    summary=summarize(rows),
                     routes={key: summarize(value) for key, value in groups.items()})
 
     def comparison(self):

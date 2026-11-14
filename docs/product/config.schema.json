@@ -7,6 +7,7 @@
           "items": {
             "$ref": "#/$defs/RoutePolicy"
           },
+          "maxItems": 1000,
           "title": "Routes",
           "type": "array"
         }
@@ -98,8 +99,22 @@
         },
         "storage_max_bytes": {
           "default": 104857600,
-          "exclusiveMinimum": 0,
+          "minimum": 131072,
           "title": "Storage Max Bytes",
+          "type": "integer"
+        },
+        "storage_path": {
+          "default": ".autotuner/metrics.sqlite3",
+          "maxLength": 4096,
+          "minLength": 1,
+          "title": "Storage Path",
+          "type": "string"
+        },
+        "writer_queue_capacity": {
+          "default": 1024,
+          "maximum": 10000,
+          "minimum": 1,
+          "title": "Writer Queue Capacity",
           "type": "integer"
         }
       },
@@ -120,6 +135,7 @@
           "type": "string"
         },
         "path": {
+          "maxLength": 1024,
           "pattern": "^/(?:[A-Za-z0-9_.~-]+|\\*)(?:/(?:[A-Za-z0-9_.~-]+|\\*))*$|^/$",
           "title": "Path",
           "type": "string"
@@ -149,6 +165,7 @@
           "type": "string"
         },
         "path": {
+          "maxLength": 1024,
           "pattern": "^/(?:[A-Za-z0-9_.~-]+|\\*)(?:/(?:[A-Za-z0-9_.~-]+|\\*))*$|^/$",
           "title": "Path",
           "type": "string"
@@ -170,6 +187,7 @@
           "type": "string"
         },
         "match": {
+          "maxLength": 1024,
           "pattern": "^/(?:[A-Za-z0-9_.~-]+|\\*)(?:/(?:[A-Za-z0-9_.~-]+|\\*))*$|^/$",
           "title": "Match",
           "type": "string"

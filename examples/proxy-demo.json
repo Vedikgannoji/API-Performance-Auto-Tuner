@@ -75,6 +75,8 @@
   "metrics": {
     "raw_capacity": 10000,
     "retention_days": 7,
-    "storage_max_bytes": 104857600
+    "storage_max_bytes": 104857600,
+    "storage_path": "../.autotuner/metrics.sqlite3",
+    "writer_queue_capacity": 1024
   }
 }
