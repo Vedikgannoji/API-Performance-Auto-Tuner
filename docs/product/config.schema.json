@@ -23,6 +23,42 @@
           "title": "Upstream Concurrency",
           "type": "integer"
         },
+        "queue_capacity": {
+          "default": 64,
+          "exclusiveMinimum": 0,
+          "title": "Queue Capacity",
+          "type": "integer"
+        },
+        "request_body_bytes": {
+          "default": 8388608,
+          "exclusiveMinimum": 0,
+          "title": "Request Body Bytes",
+          "type": "integer"
+        },
+        "header_bytes": {
+          "default": 65536,
+          "exclusiveMinimum": 0,
+          "title": "Header Bytes",
+          "type": "integer"
+        },
+        "connect_timeout_seconds": {
+          "default": 5,
+          "exclusiveMinimum": 0,
+          "title": "Connect Timeout Seconds",
+          "type": "integer"
+        },
+        "read_timeout_seconds": {
+          "default": 30,
+          "exclusiveMinimum": 0,
+          "title": "Read Timeout Seconds",
+          "type": "integer"
+        },
+        "response_timeout_seconds": {
+          "default": 60,
+          "exclusiveMinimum": 0,
+          "title": "Response Timeout Seconds",
+          "type": "integer"
+        },
         "cache_bytes": {
           "default": 67108864,
           "exclusiveMinimum": 0,
@@ -94,6 +130,35 @@
         "path"
       ],
       "title": "Mutation",
+      "type": "object"
+    },
+    "Operation": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "enum": [
+            "GET",
+            "HEAD",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "OPTIONS"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "path": {
+          "pattern": "^/(?:[A-Za-z0-9_.~-]+|\\*)(?:/(?:[A-Za-z0-9_.~-]+|\\*))*$|^/$",
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method",
+        "path"
+      ],
+      "title": "Operation",
       "type": "object"
     },
     "RoutePolicy": {
@@ -194,6 +259,14 @@
       "title": "Mode",
       "type": "string"
     },
+    "operations": {
+      "items": {
+        "$ref": "#/$defs/Operation"
+      },
+      "maxItems": 1000,
+      "title": "Operations",
+      "type": "array"
+    },
     "limits": {
       "$ref": "#/$defs/Limits"
     },
@@ -207,8 +280,6 @@
   "required": [
     "upstream"
   ],
-  "title": "Autotuner Product Configuration Version 1",
-  "type": "object",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Shape contract. ProductConfig also enforces semantic URL, listener, budget and routing checks."
+  "title": "ProductConfig",
+  "type": "object"
 }

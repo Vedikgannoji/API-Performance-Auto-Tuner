@@ -18,7 +18,7 @@ def test_example_and_defaults():
 @pytest.mark.parametrize('value', ['ftp://example.com', 'http://user:secret@example.com',
                                   'http://example.com/api', 'http://example.com?token=secret',
                                   'http://example.com#fragment', 'http://example.com:99999',
-                                  'http://example.com:0', 'http://bad host', 'http://[bad'])
+                                  'http://example.com:0', 'http://bad host', 'http://[bad', 'http://bad\\host'])
 def test_invalid_upstream(value):
     with pytest.raises(ValidationError):
         ProductConfig(upstream=value)
@@ -61,3 +61,12 @@ def test_invalid_json_and_missing_file(tmp_path):
     path.write_text('{broken')
     with pytest.raises(json.JSONDecodeError):
         load_config(path)
+
+
+def test_operation_labels_are_independent_of_cache_rules():
+    config = ProductConfig(upstream='http://localhost:3000', operations=[
+        {'method': 'POST', 'path': '/items'}, {'method': 'GET', 'path': '/items/*'}])
+    assert config.cache.routes == [] and len(config.operations) == 2
+    with pytest.raises(ValidationError):
+        ProductConfig(upstream='http://localhost:3000', operations=[
+            {'method': 'GET', 'path': '/items/*'}, {'method': 'GET', 'path': '/*/one'}])

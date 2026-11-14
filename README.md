@@ -112,3 +112,5 @@ Phase 1 introduces an executable configuration contract and a reviewed example, 
 Phase 2 extracts the reusable core and integrates it with independent backend fixtures. See [Phase 2 core extraction and review](docs/product/PHASE_02_CORE_EXTRACTION.md). Run `python -m pytest tests/test_core.py -o addopts=""` for focused checks.
 
 Phase 3 adds the installable `autotuner` CLI, configuration checks, diagnostics and a control-only session lifecycle. See [Phase 3 CLI review](docs/product/PHASE_03_CLI.md). API forwarding remains Phase 4 work.
+
+Phase 4 adds an observation proxy with bounded upstream concurrency, streamed responses, sanitized errors and route metrics. Start the demo upstream on port 8000, then run `autotuner serve --config examples/proxy-demo.json` on port 8080. Inspect traffic with `autotuner endpoints --config examples/proxy-demo.json --window 300 --json`. Shared response caching remains disabled in this product phase. See [Phase 4 review guide](docs/product/PHASE_04_OBSERVATION_PROXY.md) for supported HTTP behavior, limits and joint tests.

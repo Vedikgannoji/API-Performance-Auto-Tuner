@@ -17,6 +17,12 @@ class Contract(BaseModel):
 
 class Limits(Contract):
     upstream_concurrency: Positive = 8
+    queue_capacity: Positive = 64
+    request_body_bytes: Positive = 8388608
+    header_bytes: Positive = 65536
+    connect_timeout_seconds: Positive = 5
+    read_timeout_seconds: Positive = 30
+    response_timeout_seconds: Positive = 60
     cache_bytes: Positive = 67108864
     cache_entries: Positive = 256
     cache_entry_bytes: Positive = 1048576
@@ -36,6 +42,11 @@ class MetricsConfig(Contract):
 
 class Mutation(Contract):
     method: Literal['POST', 'PUT', 'PATCH', 'DELETE']
+    path: Pattern
+
+
+class Operation(Contract):
+    method: Literal['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
     path: Pattern
 
 
@@ -82,9 +93,21 @@ class ProductConfig(Contract):
     upstream: str
     listen: str = '127.0.0.1:8080'
     mode: Literal['observe', 'recommend', 'adaptive'] = 'observe'
+    operations: list[Operation] = Field(default_factory=list, max_length=1000)
     limits: Limits = Field(default_factory=Limits)
     cache: CacheRules = Field(default_factory=CacheRules)
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
+
+    @model_validator(mode='after')
+    def operation_labels(self):
+        for i, first in enumerate(self.operations):
+            a = first.path.split('/')
+            for second in self.operations[i + 1:]:
+                b = second.path.split('/')
+                if (first.method == second.method and a.count('*') == b.count('*') and len(a) == len(b)
+                    and all(x == y or '*' in (x, y) for x, y in zip(a, b))):
+                    raise ValueError('Ambiguous operation labels')
+        return self
 
     @field_validator('upstream')
     @classmethod
@@ -95,7 +118,7 @@ class ProductConfig(Contract):
             valid = (parsed.scheme in ('http', 'https') and parsed.hostname and
                      not parsed.username and not parsed.password and not parsed.query and not parsed.fragment and
                      parsed.path in ('', '/') and (port is None or 1 <= port <= 65535) and
-                     not any(c.isspace() for c in value) and '@' not in parsed.netloc)
+                     not any(c.isspace() for c in value) and '@' not in parsed.netloc and '\\' not in value)
         except ValueError:
             valid = False
         if not valid:
@@ -108,7 +131,8 @@ class ProductConfig(Contract):
         try:
             host, port = value.rsplit(':', 1)
             host = host.removeprefix('[').removesuffix(']')
-            valid = ipaddress.ip_address(host).is_loopback and port.isdigit() and 1 <= int(port) <= 65535
+            valid = (ipaddress.ip_address(host).is_loopback and port.isdigit() and 1 <= int(port) <= 65535
+                     and (':' not in host or value.startswith('[')))
         except ValueError:
             valid = False
         if not valid:

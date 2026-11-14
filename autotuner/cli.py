@@ -1,4 +1,4 @@
-"""Installable Phase 3 command interface; no implicit upstream traffic."""
+"""Installable observation-proxy command interface."""
 import argparse
 import json
 import logging
@@ -23,7 +23,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def parser():
-    root = argparse.ArgumentParser(prog='autotuner', description='Local API tooling. Phase 3: configuration and control sessions; forwarding arrives in Phase 4.')
+    root = argparse.ArgumentParser(prog='autotuner', description='Local API observation proxy. Shared response caching is not enabled.')
     root.add_argument('--version', action='version', version='autotuner ' + VERSION)
     commands = root.add_subparsers(dest='command', required=True)
     init = commands.add_parser('init', help='Create an observe-mode JSON configuration')
@@ -34,13 +34,15 @@ def parser():
     config = commands.add_parser('config', help='Validate resolved configuration')
     checks = config.add_subparsers(dest='config_command', required=True)
     check = checks.add_parser('check')
-    serve = commands.add_parser('serve', help='Run a loopback control session (not a proxy yet)')
+    serve = commands.add_parser('serve', help='Run the loopback observation proxy')
     serve.add_argument('--check', action='store_true', help='Validate without opening a listener')
     serve.add_argument('--shutdown-timeout', type=int, default=5)
     doctor = commands.add_parser('doctor', help='Offline checks; optional explicit TCP connectivity check')
     doctor.add_argument('--connect', action='store_true')
     status = commands.add_parser('status', help='Query an already running local control session')
-    for sub in (check, serve, doctor, status):
+    endpoints = commands.add_parser('endpoints', help='Query observed route metrics')
+    endpoints.add_argument('--window', type=int, default=60)
+    for sub in (check, serve, doctor, status, endpoints):
         sub.add_argument('--config', default=None)
         sub.add_argument('--upstream', default=None)
         sub.add_argument('--listen', default=None)
@@ -85,37 +87,47 @@ def main(argv=None):
             emit({'schema_version': 1, 'valid': True, 'config': config.model_dump()}, args.json)
         elif args.command == 'doctor':
             result = {'schema_version': 1, 'config_valid': True, 'python': sys.version.split()[0],
-                      'forwarding_available': False, 'upstream_check': 'not_requested'}
+                      'forwarding_available': True, 'upstream_check': 'not_requested'}
             if args.connect:
                 upstream = urlsplit(config.upstream)
                 with socket.create_connection((upstream.hostname, upstream.port or (443 if upstream.scheme == 'https' else 80)), timeout=2):
                     pass
                 result['upstream_check'] = 'tcp_reachable_tls_not_tested'
             emit(result, args.json)
-        elif args.command == 'status':
+        elif args.command in ('status', 'endpoints'):
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
-            with opener.open('http://' + config.listen + '/_autotuner/status', timeout=2) as response:
+            endpoint = '/_autotuner/status'
+            if args.command == 'endpoints':
+                if not 1 <= args.window <= 3600:
+                    raise ValueError('Invalid metrics window')
+                endpoint = '/_autotuner/metrics?window=' + str(args.window)
+            with opener.open('http://' + config.listen + endpoint, timeout=2) as response:
                 try:
                     data = json.load(response)
                 except ValueError as exc:
                     raise OSError('Invalid local session response') from exc
-            if not isinstance(data, dict) or data.get('schema_version') != 1 or data.get('phase') != 3 or not isinstance(data.get('session_id'), str):
+            if (not isinstance(data, dict) or data.get('schema_version') != 1 or
+                not isinstance(data.get('session_id'), str) or
+                (args.command == 'status' and data.get('phase') not in (3, 4)) or
+                (args.command == 'endpoints' and not isinstance(data.get('routes'), dict))):
                 raise OSError('Listener did not return a compatible control session')
             emit(data, args.json)
         else:
             if args.shutdown_timeout < 1:
                 raise ValueError('Shutdown timeout must be positive')
             if args.check:
-                emit({'schema_version': 1, 'valid': True, 'forwarding_enabled': False, 'config': config.model_dump()}, args.json)
+                emit({'schema_version': 1, 'valid': True, 'forwarding_enabled': False, 'forwarding_available': True, 'config': config.model_dump()}, args.json)
                 return 0
             if args.json:
                 raise ValueError('Use serve --check --json or status --json; foreground serve emits diagnostics on stderr')
             import uvicorn
             host, port = config.listen.rsplit(':', 1)
-            print('Phase 3 control-only session; forwarding and shared cache serving are unavailable.', file=sys.stderr)
+            print('Observation proxy enabled; shared cache serving is disabled until its dedicated phase.', file=sys.stderr)
             logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+            logging.getLogger('httpx').setLevel(logging.WARNING)
+            logging.getLogger('httpcore').setLevel(logging.WARNING)
             uvicorn.run(ControlSession(config), host=host.strip('[]'), port=int(port),
-                        log_config=None, timeout_graceful_shutdown=args.shutdown_timeout)
+                        log_config=None, access_log=False, timeout_graceful_shutdown=args.shutdown_timeout)
         return 0
     except ValidationError as exc:
         locations = ['.'.join(map(str, item['loc'])) or 'configuration' for item in exc.errors(include_input=False)]

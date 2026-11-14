@@ -66,7 +66,7 @@ def test_serve_runner_and_interruption(config, monkeypatch, capsys):
     monkeypatch.setattr(uvicorn, 'run', runner)
     assert cli.main(['serve', '--listen', '[::1]:8082']) == 0
     assert runner.call_args.kwargs['host'] == '::1'
-    assert runner.call_args.args[0].status()['forwarding_enabled'] is False
+    assert runner.call_args.args[0].status()['forwarding_enabled'] is True
     assert not capsys.readouterr().out
     assert cli.main(['serve', '--json']) == 2
     assert cli.main(['serve', '--shutdown-timeout', '0']) == 2
@@ -116,8 +116,18 @@ def test_module_entrypoint_and_redirect_policy(monkeypatch, capsys):
     assert cli.NoRedirect().redirect_request(None, None, 302, '', {}, 'http://example.com') is None
 
 
+def test_endpoint_metrics_command(config, monkeypatch, capsys):
+    from contextlib import nullcontext
+    opener = Mock(open=Mock(return_value=nullcontext(io.StringIO('{"schema_version":1,"session_id":"abc","routes":{}}'))))
+    monkeypatch.setattr(cli.urllib.request, 'build_opener', Mock(return_value=opener))
+    assert cli.main(['endpoints', '--window', '300', '--json']) == 0
+    assert json.loads(capsys.readouterr().out)['routes'] == {}
+    assert opener.open.call_args.args[0].endswith('/_autotuner/metrics?window=300')
+    assert cli.main(['endpoints', '--window', '0']) == 2
+
+
 def test_session_lifecycle_and_unsupported_forwarding():
-    app = ControlSession(ProductConfig(upstream='http://localhost:3000', mode='adaptive'))
+    app = ControlSession(ProductConfig(upstream='http://localhost:3000', mode='adaptive'), transport=httpx.MockTransport(lambda request: httpx.Response(200, content=b'ok')))
     async def scenario():
         messages = iter([{'type': 'lifespan.startup'}, {'type': 'lifespan.shutdown'}])
         sent = []
@@ -126,7 +136,7 @@ def test_session_lifecycle_and_unsupported_forwarding():
         await app({'type': 'lifespan'}, receive, send)
         assert sent == [('lifespan.startup.complete', True), ('lifespan.shutdown.complete', False)]
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
-            assert (await client.get('/_autotuner/status')).json()['forwarding_enabled'] is False
+            assert (await client.get('/_autotuner/status')).json()['forwarding_enabled'] is True
             assert (await client.post('/_autotuner/health')).status_code == 405
-            assert (await client.get('/api/products')).status_code == 501
+            assert (await client.options('/_autotuner/status')).status_code == 405
     asyncio.run(scenario())

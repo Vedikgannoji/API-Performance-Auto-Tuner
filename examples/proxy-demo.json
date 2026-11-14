@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "upstream": "http://127.0.0.1:8000",
+  "listen": "127.0.0.1:8080",
+  "mode": "observe",
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/api/users"
+    },
+    {
+      "method": "POST",
+      "path": "/api/users"
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/*"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/users/*"
+    },
+    {
+      "method": "GET",
+      "path": "/api/products"
+    },
+    {
+      "method": "POST",
+      "path": "/api/products"
+    },
+    {
+      "method": "GET",
+      "path": "/api/products/*"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/products/*"
+    },
+    {
+      "method": "GET",
+      "path": "/api/orders"
+    },
+    {
+      "method": "POST",
+      "path": "/api/orders"
+    },
+    {
+      "method": "GET",
+      "path": "/api/orders/*"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/orders/*/status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/sales"
+    }
+  ],
+  "limits": {
+    "upstream_concurrency": 8,
+    "queue_capacity": 64,
+    "request_body_bytes": 8388608,
+    "header_bytes": 65536,
+    "connect_timeout_seconds": 5,
+    "read_timeout_seconds": 30,
+    "response_timeout_seconds": 60,
+    "cache_bytes": 67108864,
+    "cache_entries": 256,
+    "cache_entry_bytes": 1048576
+  },
+  "cache": {
+    "routes": []
+  },
+  "metrics": {
+    "raw_capacity": 10000,
+    "retention_days": 7,
+    "storage_max_bytes": 104857600
+  }
+}
