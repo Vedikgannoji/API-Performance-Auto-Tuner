@@ -1,0 +1,173 @@
+{
+  "verified_on": "2026-11-14",
+  "command": "python scripts/test_socketless.py --tb=short --junitxml=tmp/test-results.xml",
+  "test_result": {
+    "passed": 55,
+    "failed": 0
+  },
+  "coverage": {
+    "covered_lines": 451,
+    "num_statements": 451,
+    "percent_covered": 100.0,
+    "percent_covered_display": "100",
+    "missing_lines": 0,
+    "excluded_lines": 0,
+    "percent_statements_covered": 100.0,
+    "percent_statements_covered_display": "100",
+    "num_branches": 106,
+    "num_partial_branches": 0,
+    "covered_branches": 106,
+    "missing_branches": 0,
+    "percent_branches_covered": 100.0,
+    "percent_branches_covered_display": "100"
+  },
+  "modules": {
+    "autotuner/__init__.py": {
+      "covered_lines": 0,
+      "num_statements": 0,
+      "percent_covered": 100.0,
+      "percent_covered_display": "100",
+      "missing_lines": 0,
+      "excluded_lines": 0,
+      "percent_statements_covered": 100.0,
+      "percent_statements_covered_display": "100",
+      "num_branches": 0,
+      "num_partial_branches": 0,
+      "covered_branches": 0,
+      "missing_branches": 0,
+      "percent_branches_covered": 100.0,
+      "percent_branches_covered_display": "100"
+    },
+    "autotuner/cache.py": {
+      "covered_lines": 176,
+      "num_statements": 176,
+      "percent_covered": 100.0,
+      "percent_covered_display": "100",
+      "missing_lines": 0,
+      "excluded_lines": 0,
+      "percent_statements_covered": 100.0,
+      "percent_statements_covered_display": "100",
+      "num_branches": 64,
+      "num_partial_branches": 0,
+      "covered_branches": 64,
+      "missing_branches": 0,
+      "percent_branches_covered": 100.0,
+      "percent_branches_covered_display": "100"
+    },
+    "autotuner/database.py": {
+      "covered_lines": 44,
+      "num_statements": 44,
+      "percent_covered": 100.0,
+      "percent_covered_display": "100",
+      "missing_lines": 0,
+      "excluded_lines": 0,
+      "percent_statements_covered": 100.0,
+      "percent_statements_covered_display": "100",
+      "num_branches": 4,
+      "num_partial_branches": 0,
+      "covered_branches": 4,
+      "missing_branches": 0,
+      "percent_branches_covered": 100.0,
+      "percent_branches_covered_display": "100"
+    },
+    "autotuner/main.py": {
+      "covered_lines": 150,
+      "num_statements": 150,
+      "percent_covered": 100.0,
+      "percent_covered_display": "100",
+      "missing_lines": 0,
+      "excluded_lines": 0,
+      "percent_statements_covered": 100.0,
+      "percent_statements_covered_display": "100",
+      "num_branches": 18,
+      "num_partial_branches": 0,
+      "covered_branches": 18,
+      "missing_branches": 0,
+      "percent_branches_covered": 100.0,
+      "percent_branches_covered_display": "100"
+    },
+    "autotuner/metrics.py": {
+      "covered_lines": 47,
+      "num_statements": 47,
+      "percent_covered": 100.0,
+      "percent_covered_display": "100",
+      "missing_lines": 0,
+      "excluded_lines": 0,
+      "percent_statements_covered": 100.0,
+      "percent_statements_covered_display": "100",
+      "num_branches": 18,
+      "num_partial_branches": 0,
+      "covered_branches": 18,
+      "missing_branches": 0,
+      "percent_branches_covered": 100.0,
+      "percent_branches_covered_display": "100"
+    },
+    "autotuner/schemas.py": {
+      "covered_lines": 34,
+      "num_statements": 34,
+      "percent_covered": 100.0,
+      "percent_covered_display": "100",
+      "missing_lines": 0,
+      "excluded_lines": 0,
+      "percent_statements_covered": 100.0,
+      "percent_statements_covered_display": "100",
+      "num_branches": 2,
+      "num_partial_branches": 0,
+      "covered_branches": 2,
+      "missing_branches": 0,
+      "percent_branches_covered": 100.0,
+      "percent_branches_covered_display": "100"
+    }
+  },
+  "source_sha256": {
+    "autotuner/__init__.py": "3fabac76430f0af6f9a9822c1e131b9a2ee992851de26db345019af804653e3a",
+    "autotuner/cache.py": "32bdca1dabb08f41ca8a8bdbf2db3e2e502a8267cbcbca080e820fe98ea7959f",
+    "autotuner/database.py": "99fea81ca0757a0f289533e6e98657bf818f971b2efcaf492c0d057bc7a042f4",
+    "autotuner/main.py": "e1d87d11c67b445e289473a4290e280f2c2a2f4945715ef4a15c3d44e8bb54fb",
+    "autotuner/metrics.py": "5a5535c65ff4c66e7603fae2a1cd8b70486cd8b36c60c32aacdd6e4a298393d3",
+    "autotuner/schemas.py": "0306b6c444cabb1e5379abb01aff603c144d188a19d9efdbc698cb8322fe8e29",
+    "autotuner/workflow.js": "0ca385617f52c7124250b5b7a794e2eef0b84750941cd0715b52ba23676f61cd"
+  },
+  "versions": {
+    "fastapi": "0.104.1",
+    "uvicorn": "0.24.0",
+    "pydantic": "2.14.3",
+    "starlette": "0.27.0",
+    "httpx": "0.28.1",
+    "anyio": "3.7.1",
+    "pytest": "7.4.3",
+    "pytest-cov": "7.1.0",
+    "coverage": "7.16.2"
+  },
+  "transport": "HTTPX ASGITransport; socketless polling event loop in managed Windows sandbox",
+  "real_http_benchmark": {
+    "status": "retained_user_run_before_latest_timing_revision",
+    "artifact": "benchmarks/latest.json",
+    "median_improvement_percent": 73.5439893089258,
+    "requires_rerun_for_current_source": true
+  },
+  "hosted_ci": "not_run",
+  "browser_visual_qa": "not_run",
+  "dashboard_javascript_syntax": "passed: node --check",
+  "packaging": {
+    "status": "not_rebuilt_after_credential_bypass_fix"
+  },
+  "cache_controls": "token-free; enable, disable, and clear tested without Authorization",
+  "sql_profile": {
+    "artifact": "docs/SQL_PROFILE.json",
+    "scope": "isolated SQL query only",
+    "median_query_reduction_percent": 63.68205353704127
+  },
+  "workflow_checks": {
+    "engine_tests_passed": 9,
+    "command": "node --test tests/workflow.test.cjs",
+    "real_javascript_to_asgi_integration": "passed",
+    "visual_browser_qa": "not_run_for_workflow_ui"
+  },
+  "cache_bypass_regression": "cookie-bearing reads counted without training shared policies; anonymous dashboard requests omit credentials",
+  "timing": {
+    "clock": "perf_counter",
+    "observed_resolution_seconds": 1e-07,
+    "previous_monotonic_resolution_seconds": 0.015625
+  }
+}

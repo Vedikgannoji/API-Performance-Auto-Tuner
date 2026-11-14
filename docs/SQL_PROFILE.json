@@ -1,0 +1,76 @@
+{
+  "scope": "SQL query only; not HTTP or cache performance",
+  "orders": 50000,
+  "repeats": 7,
+  "before": {
+    "latencies_ms": [
+      91.74500001245178,
+      100.92550000990741,
+      87.87769998889416,
+      75.83319998229854,
+      79.9022999999579,
+      120.06129999645054,
+      169.17219999595545
+    ],
+    "median_ms": 91.74500001245178,
+    "query_plan": [
+      {
+        "id": 8,
+        "parent": 0,
+        "notused": 0,
+        "detail": "SCAN p"
+      },
+      {
+        "id": 12,
+        "parent": 0,
+        "notused": 0,
+        "detail": "BLOOM FILTER ON o (product_id=?)"
+      },
+      {
+        "id": 27,
+        "parent": 0,
+        "notused": 0,
+        "detail": "SEARCH o USING AUTOMATIC PARTIAL COVERING INDEX (product_id=?) LEFT-JOIN"
+      },
+      {
+        "id": 85,
+        "parent": 0,
+        "notused": 0,
+        "detail": "USE TEMP B-TREE FOR ORDER BY"
+      }
+    ]
+  },
+  "after": {
+    "latencies_ms": [
+      37.48419997282326,
+      32.39849998499267,
+      33.31989998696372,
+      39.252999995369464,
+      33.61799998674542,
+      25.96800000173971,
+      25.552499981131405
+    ],
+    "median_ms": 33.31989998696372,
+    "query_plan": [
+      {
+        "id": 8,
+        "parent": 0,
+        "notused": 0,
+        "detail": "SCAN p"
+      },
+      {
+        "id": 10,
+        "parent": 0,
+        "notused": 0,
+        "detail": "SEARCH o USING COVERING INDEX orders_sales_idx (product_id=?) LEFT-JOIN"
+      },
+      {
+        "id": 67,
+        "parent": 0,
+        "notused": 0,
+        "detail": "USE TEMP B-TREE FOR ORDER BY"
+      }
+    ]
+  },
+  "query_latency_reduction_percent": 63.68205353704127
+}

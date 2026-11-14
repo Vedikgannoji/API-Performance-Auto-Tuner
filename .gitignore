@@ -1,4 +1,12 @@
 # Dependencies
+.venv/
+__pycache__/
+*.pyc
+*.sqlite3*
+.coverage
+coverage.json
+.pytest_cache/
+*.egg-info/
 node_modules/
 package-lock.json
 
