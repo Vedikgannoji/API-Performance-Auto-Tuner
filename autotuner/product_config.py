@@ -1,0 +1,121 @@
+"""Version one product configuration contract; not yet wired to a proxy."""
+import ipaddress
+import json
+from pathlib import Path
+from typing import Annotated, Literal
+from urllib.parse import urlsplit
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+Positive = Annotated[int, Field(strict=True, gt=0)]
+Pattern = Annotated[str, Field(pattern=r'^/(?:[A-Za-z0-9_.~-]+|\*)(?:/(?:[A-Za-z0-9_.~-]+|\*))*$|^/$')]
+
+
+class Contract(BaseModel):
+    model_config = ConfigDict(extra='forbid', validate_default=True)
+
+
+class Limits(Contract):
+    upstream_concurrency: Positive = 8
+    cache_bytes: Positive = 67108864
+    cache_entries: Positive = 256
+    cache_entry_bytes: Positive = 1048576
+
+    @model_validator(mode='after')
+    def entry_budget(self):
+        if self.cache_entry_bytes > self.cache_bytes:
+            raise ValueError('cache_entry_bytes cannot exceed cache_bytes')
+        return self
+
+
+class MetricsConfig(Contract):
+    raw_capacity: Positive = 10000
+    retention_days: Positive = 7
+    storage_max_bytes: Positive = 104857600
+
+
+class Mutation(Contract):
+    method: Literal['POST', 'PUT', 'PATCH', 'DELETE']
+    path: Pattern
+
+
+class RoutePolicy(Contract):
+    id: Annotated[str, Field(pattern=r'^[a-z][a-z0-9-]{0,63}$')]
+    match: Pattern
+    methods: list[Literal['GET']] = Field(default_factory=lambda: ['GET'], min_length=1, max_length=1)
+    policy: Literal['observe', 'adaptive'] = 'observe'
+    ttl_min_seconds: Positive = 2
+    ttl_max_seconds: Positive = 30
+    vary_headers: list[Literal['Accept', 'Accept-Encoding']] = Field(default_factory=list)
+    invalidate_on: list[Mutation] = Field(default_factory=list)
+
+    @model_validator(mode='after')
+    def bounds(self):
+        if self.ttl_min_seconds > self.ttl_max_seconds:
+            raise ValueError('TTL minimum cannot exceed maximum')
+        if len(set(self.vary_headers)) != len(self.vary_headers):
+            raise ValueError('Duplicate variant header')
+        return self
+
+
+class CacheRules(Contract):
+    routes: list[RoutePolicy] = Field(default_factory=list)
+
+    @model_validator(mode='after')
+    def unambiguous(self):
+        ids = [route.id for route in self.routes]
+        if len(ids) != len(set(ids)):
+            raise ValueError('Route IDs must be unique')
+        for i, first in enumerate(self.routes):
+            a = first.match.split('/')
+            for second in self.routes[i + 1:]:
+                b = second.match.split('/')
+                same_specificity = a.count('*') == b.count('*')
+                overlap = len(a) == len(b) and all(x == y or '*' in (x, y) for x, y in zip(a, b))
+                if same_specificity and overlap:
+                    raise ValueError(f'Ambiguous routes: {first.id} and {second.id}')
+        return self
+
+
+class ProductConfig(Contract):
+    schema_version: Literal[1] = 1
+    upstream: str
+    listen: str = '127.0.0.1:8080'
+    mode: Literal['observe', 'recommend', 'adaptive'] = 'observe'
+    limits: Limits = Field(default_factory=Limits)
+    cache: CacheRules = Field(default_factory=CacheRules)
+    metrics: MetricsConfig = Field(default_factory=MetricsConfig)
+
+    @field_validator('upstream')
+    @classmethod
+    def upstream_authority(cls, value):
+        try:
+            parsed = urlsplit(value)
+            port = parsed.port
+            valid = (parsed.scheme in ('http', 'https') and parsed.hostname and
+                     not parsed.username and not parsed.password and not parsed.query and not parsed.fragment and
+                     parsed.path in ('', '/') and (port is None or 1 <= port <= 65535) and
+                     not any(c.isspace() for c in value) and '@' not in parsed.netloc)
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError('upstream must be an HTTP(S) authority without credentials, query, fragment or base path')
+        return value.rstrip('/')
+
+    @field_validator('listen')
+    @classmethod
+    def local_listener(cls, value):
+        try:
+            host, port = value.rsplit(':', 1)
+            host = host.removeprefix('[').removesuffix(']')
+            valid = ipaddress.ip_address(host).is_loopback and port.isdigit() and 1 <= int(port) <= 65535
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError('listen must be a loopback IP and port, for example 127.0.0.1:8080 or [::1]:8080')
+        return value
+
+
+def load_config(path: str | Path) -> ProductConfig:
+    """Parse and validate only; never opens a listener or contacts an upstream."""
+    return ProductConfig.model_validate(json.loads(Path(path).read_text(encoding='utf-8')))

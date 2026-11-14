@@ -1,0 +1,132 @@
+import asyncio
+import io
+import json
+import sys
+from unittest.mock import Mock
+
+import httpx
+import pytest
+
+from autotuner import cli
+from autotuner.product_config import ProductConfig
+from autotuner.session import ControlSession
+
+
+@pytest.fixture
+def config(tmp_path, monkeypatch):
+    for name in ('CONFIG', 'UPSTREAM', 'LISTEN', 'MODE'):
+        monkeypatch.delenv('AUTOTUNER_' + name, raising=False)
+    path = tmp_path / 'autotuner.json'
+    path.write_text('{"upstream":"http://127.0.0.1:3000"}')
+    monkeypatch.chdir(tmp_path)
+    return path
+
+
+def test_init_and_overwrite(config, capsys):
+    assert cli.main(['init']) == 2
+    assert cli.main(['init', '--force', '--json']) == 0
+    assert json.loads(capsys.readouterr().out)['mode'] == 'observe'
+    assert json.loads(config.read_text())['cache']['routes'] == []
+
+
+def test_precedence_and_offline_checks(config, monkeypatch, capsys):
+    monkeypatch.setenv('AUTOTUNER_CONFIG', str(config))
+    monkeypatch.setenv('AUTOTUNER_UPSTREAM', 'http://localhost:4000')
+    monkeypatch.setenv('AUTOTUNER_MODE', 'recommend')
+    assert cli.main(['config', 'check', '--json', '--upstream', 'https://example.com']) == 0
+    result = json.loads(capsys.readouterr().out)['config']
+    assert result['upstream'] == 'https://example.com' and result['mode'] == 'recommend'
+    network = Mock(side_effect=AssertionError('unexpected network'))
+    monkeypatch.setattr(cli.socket, 'create_connection', network)
+    assert cli.main(['doctor', '--json']) == 0
+    assert json.loads(capsys.readouterr().out)['upstream_check'] == 'not_requested'
+    assert cli.main(['serve', '--check', '--json']) == 0
+    assert json.loads(capsys.readouterr().out)['forwarding_enabled'] is False
+    network.assert_not_called()
+
+
+@pytest.mark.parametrize('text', ['{bad', '[]', '{"upstream":"http://user:super-secret@localhost"}',
+                                  '{"upstream":"http://localhost","extra":"super-secret"}'])
+def test_invalid_config_is_redacted(config, capsys, text):
+    config.write_text(text)
+    assert cli.main(['config', 'check', '--json']) == 2
+    captured = capsys.readouterr()
+    assert not captured.out and 'super-secret' not in captured.err
+
+
+def test_missing_file_and_io_failure(config, monkeypatch):
+    assert cli.main(['config', 'check', '--config', 'missing.json']) == 2
+    monkeypatch.setattr(cli, 'resolved_config', Mock(side_effect=PermissionError()))
+    assert cli.main(['doctor']) == 1
+
+
+def test_serve_runner_and_interruption(config, monkeypatch, capsys):
+    import uvicorn
+    runner = Mock()
+    monkeypatch.setattr(uvicorn, 'run', runner)
+    assert cli.main(['serve', '--listen', '[::1]:8082']) == 0
+    assert runner.call_args.kwargs['host'] == '::1'
+    assert runner.call_args.args[0].status()['forwarding_enabled'] is False
+    assert not capsys.readouterr().out
+    assert cli.main(['serve', '--json']) == 2
+    assert cli.main(['serve', '--shutdown-timeout', '0']) == 2
+    runner.side_effect = KeyboardInterrupt()
+    assert cli.main(['serve']) == 0
+
+
+def test_explicit_connect_and_status(config, monkeypatch, capsys):
+    from contextlib import nullcontext
+    connection = Mock(return_value=nullcontext())
+    monkeypatch.setattr(cli.socket, 'create_connection', connection)
+    assert cli.main(['doctor', '--connect', '--json']) == 0
+    assert json.loads(capsys.readouterr().out)['upstream_check'].startswith('tcp_reachable')
+    assert connection.call_args.kwargs['timeout'] == 2
+    config.write_text('{"upstream":"https://example.com"}')
+    assert cli.main(['doctor', '--connect']) == 0
+    assert connection.call_args.args[0][1] == 443
+    monkeypatch.setattr(cli.urllib.request, 'build_opener', Mock(return_value=Mock(open=Mock(return_value=nullcontext(io.StringIO('{"schema_version":1,"phase":3,"session_id":"abc"}'))))))
+    capsys.readouterr()
+    assert cli.main(['status', '--json']) == 0
+    assert json.loads(capsys.readouterr().out)['session_id'] == 'abc'
+    monkeypatch.setattr(cli.urllib.request, 'build_opener', Mock(return_value=Mock(open=Mock(return_value=nullcontext(io.StringIO('{}'))))))
+    assert cli.main(['status']) == 1
+    monkeypatch.setattr(cli.urllib.request, 'build_opener', Mock(return_value=Mock(open=Mock(return_value=nullcontext(io.StringIO('not-json'))))))
+    assert cli.main(['status']) == 1
+
+
+def test_help_version_and_entrypoint(config, monkeypatch, capsys):
+    for args in (['--help'], ['--version']):
+        with pytest.raises(SystemExit) as exc:
+            cli.main(args)
+        assert exc.value.code == 0
+    assert '2.0.0' in capsys.readouterr().out
+    monkeypatch.setattr(sys, 'argv', ['autotuner', 'doctor'])
+    with pytest.raises(SystemExit) as exc:
+        cli.entrypoint()
+    assert exc.value.code == 0
+
+
+def test_module_entrypoint_and_redirect_policy(monkeypatch, capsys):
+    import runpy
+    monkeypatch.setattr(sys, 'argv', ['autotuner', '--version'])
+    with pytest.raises(SystemExit) as exc:
+        runpy.run_module('autotuner', run_name='__main__')
+    assert exc.value.code == 0
+    assert '2.0.0' in capsys.readouterr().out
+    assert cli.NoRedirect().redirect_request(None, None, 302, '', {}, 'http://example.com') is None
+
+
+def test_session_lifecycle_and_unsupported_forwarding():
+    app = ControlSession(ProductConfig(upstream='http://localhost:3000', mode='adaptive'))
+    async def scenario():
+        messages = iter([{'type': 'lifespan.startup'}, {'type': 'lifespan.shutdown'}])
+        sent = []
+        async def receive(): return next(messages)
+        async def send(message): sent.append((message['type'], app.running))
+        await app({'type': 'lifespan'}, receive, send)
+        assert sent == [('lifespan.startup.complete', True), ('lifespan.shutdown.complete', False)]
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+            assert (await client.get('/_autotuner/status')).json()['forwarding_enabled'] is False
+            assert (await client.post('/_autotuner/health')).status_code == 405
+            assert (await client.get('/api/products')).status_code == 501
+    asyncio.run(scenario())

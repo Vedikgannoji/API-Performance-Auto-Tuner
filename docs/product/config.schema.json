@@ -1,0 +1,214 @@
+{
+  "$defs": {
+    "CacheRules": {
+      "additionalProperties": false,
+      "properties": {
+        "routes": {
+          "items": {
+            "$ref": "#/$defs/RoutePolicy"
+          },
+          "title": "Routes",
+          "type": "array"
+        }
+      },
+      "title": "CacheRules",
+      "type": "object"
+    },
+    "Limits": {
+      "additionalProperties": false,
+      "properties": {
+        "upstream_concurrency": {
+          "default": 8,
+          "exclusiveMinimum": 0,
+          "title": "Upstream Concurrency",
+          "type": "integer"
+        },
+        "cache_bytes": {
+          "default": 67108864,
+          "exclusiveMinimum": 0,
+          "title": "Cache Bytes",
+          "type": "integer"
+        },
+        "cache_entries": {
+          "default": 256,
+          "exclusiveMinimum": 0,
+          "title": "Cache Entries",
+          "type": "integer"
+        },
+        "cache_entry_bytes": {
+          "default": 1048576,
+          "exclusiveMinimum": 0,
+          "title": "Cache Entry Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "Limits",
+      "type": "object"
+    },
+    "MetricsConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "raw_capacity": {
+          "default": 10000,
+          "exclusiveMinimum": 0,
+          "title": "Raw Capacity",
+          "type": "integer"
+        },
+        "retention_days": {
+          "default": 7,
+          "exclusiveMinimum": 0,
+          "title": "Retention Days",
+          "type": "integer"
+        },
+        "storage_max_bytes": {
+          "default": 104857600,
+          "exclusiveMinimum": 0,
+          "title": "Storage Max Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "MetricsConfig",
+      "type": "object"
+    },
+    "Mutation": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "enum": [
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "path": {
+          "pattern": "^/(?:[A-Za-z0-9_.~-]+|\\*)(?:/(?:[A-Za-z0-9_.~-]+|\\*))*$|^/$",
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "method",
+        "path"
+      ],
+      "title": "Mutation",
+      "type": "object"
+    },
+    "RoutePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9-]{0,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "match": {
+          "pattern": "^/(?:[A-Za-z0-9_.~-]+|\\*)(?:/(?:[A-Za-z0-9_.~-]+|\\*))*$|^/$",
+          "title": "Match",
+          "type": "string"
+        },
+        "methods": {
+          "items": {
+            "const": "GET",
+            "type": "string"
+          },
+          "maxItems": 1,
+          "minItems": 1,
+          "title": "Methods",
+          "type": "array"
+        },
+        "policy": {
+          "default": "observe",
+          "enum": [
+            "observe",
+            "adaptive"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "ttl_min_seconds": {
+          "default": 2,
+          "exclusiveMinimum": 0,
+          "title": "Ttl Min Seconds",
+          "type": "integer"
+        },
+        "ttl_max_seconds": {
+          "default": 30,
+          "exclusiveMinimum": 0,
+          "title": "Ttl Max Seconds",
+          "type": "integer"
+        },
+        "vary_headers": {
+          "items": {
+            "enum": [
+              "Accept",
+              "Accept-Encoding"
+            ],
+            "type": "string"
+          },
+          "title": "Vary Headers",
+          "type": "array"
+        },
+        "invalidate_on": {
+          "items": {
+            "$ref": "#/$defs/Mutation"
+          },
+          "title": "Invalidate On",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "match"
+      ],
+      "title": "RoutePolicy",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "upstream": {
+      "title": "Upstream",
+      "type": "string"
+    },
+    "listen": {
+      "default": "127.0.0.1:8080",
+      "title": "Listen",
+      "type": "string"
+    },
+    "mode": {
+      "default": "observe",
+      "enum": [
+        "observe",
+        "recommend",
+        "adaptive"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "limits": {
+      "$ref": "#/$defs/Limits"
+    },
+    "cache": {
+      "$ref": "#/$defs/CacheRules"
+    },
+    "metrics": {
+      "$ref": "#/$defs/MetricsConfig"
+    }
+  },
+  "required": [
+    "upstream"
+  ],
+  "title": "Autotuner Product Configuration Version 1",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Shape contract. ProductConfig also enforces semantic URL, listener, budget and routing checks."
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "upstream": "http://127.0.0.1:3000",
+  "listen": "127.0.0.1:8080",
+  "mode": "observe",
+  "limits": {
+    "upstream_concurrency": 8,
+    "cache_bytes": 67108864,
+    "cache_entries": 256,
+    "cache_entry_bytes": 1048576
+  },
+  "cache": {
+    "routes": []
+  },
+  "metrics": {
+    "raw_capacity": 10000,
+    "retention_days": 7,
+    "storage_max_bytes": 104857600
+  }
+}

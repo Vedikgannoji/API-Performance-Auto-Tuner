@@ -1,48 +1,26 @@
-import asyncio
 import os
 import sqlite3
 from pathlib import Path
-from time import perf_counter
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi import Path as PathParam
 from fastapi.responses import FileResponse, JSONResponse
 
-from .cache import AdaptiveCache, CacheConfig
 from .database import Database
-from .metrics import Metrics
+from .core import PerformanceEngine, Monitoring
 from .schemas import CacheMode, OrderCreate, OrderStatus, ProductCreate, ProductPatch, UserCreate, UserPatch
-
-
-class Monitoring:
-    """Pure ASGI wrapper includes exception handling, validation, and cache hits."""
-    def __init__(self, app, metrics):
-        self.app, self.metrics = app, metrics
-
-    async def __call__(self, scope, receive, send):
-        if scope['type'] != 'http' or not scope['path'].startswith('/api/'):
-            return await self.app(scope, receive, send)
-        start, status = perf_counter(), 500
-        async def capture(message):
-            nonlocal status
-            if message['type'] == 'http.response.start':
-                status = message['status']
-            await send(message)
-        try:
-            await self.app(scope, receive, capture)
-        finally:
-            route = scope.get('route')
-            self.metrics.record(scope['method'], route.path if route else '/api/{unmatched}',
-                                status, (perf_counter() - start) * 1000,
-                                scope.get('state', {}).get('cache', 'NONE'))
 
 
 def create_app(db_path=None, cache_config=None):
     app = FastAPI(title='Self-Optimizing API Performance Monitor', version='2.0.0')
     db = Database(db_path or os.getenv('AUTOTUNER_DB', 'autotuner.sqlite3'))
-    cache, metrics = AdaptiveCache(cache_config), Metrics()
+    engine = PerformanceEngine(cache_config)
+    cache, metrics = engine.cache, engine.metrics
+    app.state.engine = engine
     app.state.db, app.state.cache, app.state.metrics = db, cache, metrics
-    app.add_middleware(Monitoring, metrics=metrics)
+    app.add_middleware(Monitoring, metrics=metrics,
+                       include=lambda scope: scope['path'].startswith('/api/'),
+                       route_label=lambda scope: scope['route'].path if scope.get('route') else '/api/{unmatched}')
 
     @app.exception_handler(sqlite3.IntegrityError)
     async def integrity_error(request, exc):
@@ -58,41 +36,18 @@ def create_app(db_path=None, cache_config=None):
         return value
 
     async def read(request, response, loader):
-        # Only explicit public business reads call this helper. Authorization-bearing
-        # requests bypass shared caching even if authentication is added later.
-        if request.headers.get('authorization') or request.headers.get('cookie'):
-            request.state.cache = 'BYPASS'
-            response.headers['X-Cache'] = 'BYPASS'
-            response.headers['X-Cache-Reason'] = 'request-credentials'
-            response.headers['Cache-Control'] = 'no-store'
-            return await cache.bypass(loader)
-        # Preserve duplicate-value order: FastAPI uses the last scalar value.
-        key = (request.url.path, tuple(sorted(request.query_params.multi_items(), key=lambda pair: pair[0])))
-        value, outcome = await cache.read(request.scope['route'].path, key, loader)
-        request.state.cache = outcome
-        response.headers['X-Cache'] = outcome
-        response.headers['X-Cache-Reason'] = ('cache-hit' if outcome == 'HIT' else
-                                            'cache-disabled' if outcome == 'BYPASS' else 'origin-observation')
+        result = await engine.read(request.scope['route'].path, request.url.path,
+                                   request.query_params.multi_items(), loader,
+                                   credentialed=bool(request.headers.get('authorization') or request.headers.get('cookie')))
+        request.state.cache = result.outcome
+        response.headers['X-Cache'] = result.outcome
+        response.headers['X-Cache-Reason'] = result.reason
         response.headers['Cache-Control'] = 'no-store'
-        return value
+        return result.value
 
     async def mutate(loader, resources):
-        # Invalidate at both boundaries; generations prevent stale in-flight fills.
-        async with cache.lock:
-            cache.invalidate(resources)
-            work = asyncio.create_task(asyncio.to_thread(loader))
-            try:
-                value = found(await asyncio.shield(work))
-            except asyncio.CancelledError:
-                # Cancelling an await cannot stop a SQLite worker thread. Keep
-                # coordination until it finishes and invalidate committed data.
-                try:
-                    await work
-                finally:
-                    cache.invalidate(resources)
-                raise
-            cache.invalidate(resources)
-            return value
+        prefixes = tuple('/api/' + resource for resource in resources)
+        return found(await engine.write(loader, invalidate=prefixes))
 
     @app.get('/health')
     async def health():
@@ -175,16 +130,7 @@ def create_app(db_path=None, cache_config=None):
 
     @app.get('/analysis')
     async def analysis():
-        bottlenecks = []
-        for route, stats in metrics.snapshot()['routes'].items():
-            if stats['count'] >= 5:
-                if stats['p95_ms'] >= 50:
-                    bottlenecks.append(dict(route=route, kind='high_latency', p95_ms=stats['p95_ms'],
-                                            action='Inspect origin cost and cache reuse; compare client load results'))
-                if stats['server_error_rate'] >= .05:
-                    bottlenecks.append(dict(route=route, kind='server_errors',
-                                            action='Inspect database availability and origin failures before caching'))
-        return {'regressions': metrics.regressions(), 'bottlenecks': bottlenecks, 'cache': cache.status()}
+        return engine.analyze()
 
     @app.put('/cache/mode')
     async def mode(body: CacheMode):

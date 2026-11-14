@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "upstream": "http://127.0.0.1:3000",
+  "listen": "127.0.0.1:8080",
+  "mode": "observe",
+  "cache": {
+    "routes": [
+      {
+        "id": "product-list",
+        "match": "/products",
+        "methods": ["GET"],
+        "policy": "adaptive",
+        "ttl_min_seconds": 2,
+        "ttl_max_seconds": 30,
+        "vary_headers": ["Accept", "Accept-Encoding"],
+        "invalidate_on": [
+          {"method": "POST", "path": "/products"},
+          {"method": "PATCH", "path": "/products/*"}
+        ]
+      }
+    ]
+  }
+}

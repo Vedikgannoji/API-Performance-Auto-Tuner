@@ -102,7 +102,7 @@ def test_generation_prevents_old_inflight_fill_and_preserves_other_routes():
         read = asyncio.create_task(cache.read('/api/products', 'products', old_read))
         try:
             assert await asyncio.to_thread(started.wait, 2)
-            cache.invalidate(('products', 'reports'))
+            cache.invalidate(('/api/products', '/api/reports'))
         finally:
             release.set()
         await read

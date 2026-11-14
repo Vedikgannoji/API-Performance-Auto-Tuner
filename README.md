@@ -104,3 +104,11 @@ Dashboard requests explicitly omit browser credentials so ambient localhost cook
 ### Timing and regression precision
 
 Cache expiry, cooldown, origin duration and queue measurements now use `perf_counter`, a monotonic high-resolution clock. On the tested Windows/Python 3.12 environment, the old `monotonic` clock used a 15.625 ms timer while `perf_counter` reports a 100 ns resolution. Sub-millisecond origin durations are retained rather than quantized to zero. Policy cards explain sample collection, fast origins, low reuse, origin failures and cooldown. Regression alerts require both a 1.5x mean increase and at least 5 ms absolute increase across two five-sample cohorts within the last five minutes. This suppresses small changes such as 3.04 to 4.68 ms.
+
+## CLI product development
+
+Phase 1 introduces an executable configuration contract and a reviewed example, separate from the running demo. See [Phase 1 specification and review](docs/product/PHASE_01_SPECIFICATION.md). The generic proxy and installable CLI are future phases; the current demo startup is unchanged.
+
+Phase 2 extracts the reusable core and integrates it with independent backend fixtures. See [Phase 2 core extraction and review](docs/product/PHASE_02_CORE_EXTRACTION.md). Run `python -m pytest tests/test_core.py -o addopts=""` for focused checks.
+
+Phase 3 adds the installable `autotuner` CLI, configuration checks, diagnostics and a control-only session lifecycle. See [Phase 3 CLI review](docs/product/PHASE_03_CLI.md). API forwarding remains Phase 4 work.

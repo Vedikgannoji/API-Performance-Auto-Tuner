@@ -115,8 +115,8 @@ def main():
     if len({r[mode]['response_sha256'] for r in rounds for mode in ('off', 'adaptive')}) != 1:
         raise RuntimeError('Baseline and adaptive response bodies differ')
     result = dict(timestamp_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
-                  source_sha256={p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-                                 for p in sorted((ROOT / 'autotuner').glob('*.py'))},
+                  source_sha256={str(p.relative_to(ROOT / 'autotuner')).replace('\\', '/'): hashlib.sha256(p.read_bytes()).hexdigest()
+                                 for p in sorted((ROOT / 'autotuner').rglob('*.py'))},
                   environment=dict(python=platform.python_version(), os=platform.platform(),
                                    fastapi=__import__('fastapi').__version__, httpx=httpx.__version__,
                                    uvicorn=__import__('uvicorn').__version__),
