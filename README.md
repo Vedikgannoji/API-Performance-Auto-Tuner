@@ -1,5 +1,9 @@
 # Self-Optimizing API Performance Monitoring System
 
+The installable CLI now includes the **Phase 9 product dashboard and declarative scenario runner**. It runs beside the generic proxy, independently of the original demo below. Start your upstream, run `autotuner serve --config examples/adaptive-demo.json`, then open `autotuner dashboard --config examples/adaptive-demo.json` in another terminal. The product dashboard is at `http://127.0.0.1:8080/_autotuner/dashboard`; the proxy root continues forwarding to your upstream.
+
+See the [Phase 9 review guide](docs/product/PHASE_09_DASHBOARD_SCENARIOS.md) for complete install/start/test commands, generic scenario syntax, bounds and review steps. Browser assets have no build step or Node dependency. Optional developer JavaScript checks run with `node --test tests/workflow.test.cjs tests/product_ui.test.cjs`; pytest skips the two Python/JavaScript integrations when Node is absent. The historical demo sections below describe port 8000, not the product console.
+
 FastAPI backend with persistent business APIs, request monitoring, adaptive response caching, and baseline-based regression analysis. The Python backend is the current implementation; the original Express source remains in the repository for historical reference.
 
 ## One-click start (Windows)
@@ -85,7 +89,7 @@ python scripts/benchmark.py --orders 50000 --requests 120 --concurrency 8 --repe
 
 Coverage includes every Python module in `autotuner`, with branch reporting and an enforced 90% combined coverage floor. The benchmark starts fresh single-worker HTTP servers, uses real SQL sales aggregation without artificial sleeps, alternates baseline/adaptive order, validates response hashes and status codes, and saves raw client timings plus cache decisions to `benchmarks/latest.json`. Adaptive rounds include cold policy learning. It exits unsuccessfully if the median mean-latency reduction is below 20%.
 
-**Current evidence:** 55 backend/integration tests and 9 JavaScript tests pass; core Python statement and branch coverage are 100%. The retained user-run HTTP benchmark reports 73.54% median mean-latency reduction for its recorded workload. That artifact predates the latest timer/telemetry changes; rerun for a matching current-revision result. See [test guide](docs/TEST_GUIDE.md) and [delivery status](docs/IMPLEMENTATION_STATUS.md) for exact verification and limitations.
+**Evidence:** Phase-specific current results are in `docs/product/phase_09_validation.json`. Earlier demo results and the retained user-run HTTP benchmark (73.54% median mean-latency reduction for its workload) predate the product proxy; they are not current product performance evidence. See [test guide](docs/TEST_GUIDE.md) and [delivery status](docs/IMPLEMENTATION_STATUS.md) for the historical demo boundary.
 
 ## Configuration and scope
 

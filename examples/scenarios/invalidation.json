@@ -1,0 +1,47 @@
+{
+  "name": "RAM fixture: mutation and invalidation",
+  "steps": [
+    {
+      "name": "Warm product list",
+      "method": "GET",
+      "path": "/api/products",
+      "repeat": 6
+    },
+    {
+      "name": "Warm catalog report",
+      "method": "GET",
+      "path": "/api/reports/catalog",
+      "repeat": 6
+    },
+    {
+      "name": "Change fixture price",
+      "method": "PATCH",
+      "path": "/api/products/1",
+      "body": {
+        "price_cents": 3500
+      }
+    },
+    {
+      "name": "Verify fresh product",
+      "method": "GET",
+      "path": "/api/products/1",
+      "checks": [
+        {
+          "field": "price_cents",
+          "equals": 3500
+        }
+      ]
+    },
+    {
+      "name": "Verify dependent report",
+      "method": "GET",
+      "path": "/api/reports/catalog",
+      "checks": [
+        {
+          "field": "price_cents",
+          "equals": 3500
+        }
+      ]
+    }
+  ]
+}

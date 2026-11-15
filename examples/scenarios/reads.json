@@ -1,0 +1,21 @@
+{
+  "name": "Read-only cache learning",
+  "cycles": 1,
+  "delay_ms": 0,
+  "steps": [
+    {
+      "name": "Read products repeatedly",
+      "method": "GET",
+      "path": "/api/products",
+      "repeat": 8,
+      "expect_status": 200
+    },
+    {
+      "name": "Read catalog report",
+      "method": "GET",
+      "path": "/api/reports/catalog",
+      "repeat": 2,
+      "expect_status": 200
+    }
+  ]
+}

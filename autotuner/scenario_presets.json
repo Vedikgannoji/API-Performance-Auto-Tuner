@@ -1,0 +1,200 @@
+{
+  "reads": {
+    "name": "Read-only cache learning",
+    "cycles": 1,
+    "delay_ms": 0,
+    "steps": [
+      {
+        "name": "Read products repeatedly",
+        "method": "GET",
+        "path": "/api/products",
+        "repeat": 8,
+        "expect_status": 200
+      },
+      {
+        "name": "Read catalog report",
+        "method": "GET",
+        "path": "/api/reports/catalog",
+        "repeat": 2,
+        "expect_status": 200
+      }
+    ]
+  },
+  "invalidation": {
+    "name": "RAM fixture: mutation and invalidation",
+    "steps": [
+      {
+        "name": "Warm product list",
+        "method": "GET",
+        "path": "/api/products",
+        "repeat": 6
+      },
+      {
+        "name": "Warm catalog report",
+        "method": "GET",
+        "path": "/api/reports/catalog",
+        "repeat": 6
+      },
+      {
+        "name": "Change fixture price",
+        "method": "PATCH",
+        "path": "/api/products/1",
+        "body": {
+          "price_cents": 3500
+        }
+      },
+      {
+        "name": "Verify fresh product",
+        "method": "GET",
+        "path": "/api/products/1",
+        "checks": [
+          {
+            "field": "price_cents",
+            "equals": 3500
+          }
+        ]
+      },
+      {
+        "name": "Verify dependent report",
+        "method": "GET",
+        "path": "/api/reports/catalog",
+        "checks": [
+          {
+            "field": "price_cents",
+            "equals": 3500
+          }
+        ]
+      }
+    ]
+  },
+  "lifecycle": {
+    "name": "Business demo: captured-ID lifecycle",
+    "steps": [
+      {
+        "name": "Create user",
+        "method": "POST",
+        "path": "/api/users",
+        "body": {
+          "name": "Scenario user",
+          "email": "run-{{run_id}}-{{cycle}}@example.test"
+        },
+        "expect_status": 201,
+        "capture": {
+          "user_id": "id"
+        }
+      },
+      {
+        "name": "Create product",
+        "method": "POST",
+        "path": "/api/products",
+        "body": {
+          "name": "Scenario product",
+          "price_cents": 2000
+        },
+        "expect_status": 201,
+        "capture": {
+          "product_id": "id"
+        }
+      },
+      {
+        "name": "Create order",
+        "method": "POST",
+        "path": "/api/orders",
+        "body": {
+          "user_id": "{{user_id}}",
+          "product_id": "{{product_id}}",
+          "quantity": 2
+        },
+        "expect_status": 201,
+        "capture": {
+          "order_id": "id"
+        }
+      },
+      {
+        "name": "Verify order relationships",
+        "method": "GET",
+        "path": "/api/orders/{{order_id}}",
+        "checks": [
+          {
+            "field": "user_id",
+            "equals": "{{user_id}}"
+          },
+          {
+            "field": "product_id",
+            "equals": "{{product_id}}"
+          },
+          {
+            "field": "unit_price_cents",
+            "equals": 2000
+          }
+        ]
+      },
+      {
+        "name": "Update product price",
+        "method": "PATCH",
+        "path": "/api/products/{{product_id}}",
+        "body": {
+          "price_cents": 2500
+        }
+      },
+      {
+        "name": "Verify immutable order price",
+        "method": "GET",
+        "path": "/api/orders/{{order_id}}",
+        "checks": [
+          {
+            "field": "unit_price_cents",
+            "equals": 2000
+          }
+        ]
+      },
+      {
+        "name": "Pay order",
+        "method": "PATCH",
+        "path": "/api/orders/{{order_id}}/status",
+        "body": {
+          "status": "paid"
+        }
+      },
+      {
+        "name": "Ship order",
+        "method": "PATCH",
+        "path": "/api/orders/{{order_id}}/status",
+        "body": {
+          "status": "shipped"
+        }
+      },
+      {
+        "name": "Verify shipped order",
+        "method": "GET",
+        "path": "/api/orders/{{order_id}}",
+        "checks": [
+          {
+            "field": "status",
+            "equals": "shipped"
+          }
+        ]
+      },
+      {
+        "name": "Expected price validation",
+        "method": "POST",
+        "path": "/api/products",
+        "body": {
+          "name": "Invalid",
+          "price_cents": 0
+        },
+        "expect_status": 422
+      },
+      {
+        "name": "Expected duplicate email",
+        "method": "POST",
+        "path": "/api/users",
+        "body": {
+          "name": "Duplicate",
+          "email": "run-{{run_id}}-{{cycle}}@example.test"
+        },
+        "expect_status": 409
+      }
+    ]
+  }
+}

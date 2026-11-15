@@ -1,4 +1,4 @@
-"""Phase 8 proxy session and loopback control endpoints."""
+"""Phase 9 proxy session and loopback control endpoints."""
 import uuid
 from urllib.parse import parse_qs
 
@@ -6,6 +6,7 @@ from .proxy import ObservationProxy, json_response
 from .storage import TelemetryStorage, StorageUnavailable
 from .core.insights import analyze
 from .response_cache import effective_mode
+from .console import Console
 
 
 class ControlSession:
@@ -18,6 +19,7 @@ class ControlSession:
         self.proxy.cache.controller.listener=self.storage.record_decision
         self.proxy.metrics.observer = lambda row: self.observe("proxy", row)
         self.proxy.upstream_metrics.observer = lambda row: self.observe("upstream", row)
+        self.console=Console(self.proxy,self.status,self.storage)
 
     def observe(self, boundary, row):
         histories = (self.proxy.upstream_metrics, self.proxy.metrics)
@@ -28,9 +30,10 @@ class ControlSession:
         self.storage.submit(boundary, row)
 
     def status(self):
-        return dict(schema_version=1, session_id=self.session_id, phase=8,
+        return dict(schema_version=1, session_id=self.session_id, phase=9,
                     mode=self.config.mode, effective_mode=effective_mode(self.config), running=self.running,
                     upstream=self.config.upstream, listen=self.config.listen,
+                    dashboard_url='http://'+self.config.listen+'/_autotuner/dashboard',
                     forwarding_enabled=True, cache_serving_enabled=any(self.proxy.cache.serving(r) for r in self.config.cache.routes),
                     storage=self.storage.health(),
                     limits=self.config.limits.model_dump(), transport=dict(self.proxy.counters),cache=self.proxy.cache.status())
@@ -45,6 +48,7 @@ class ControlSession:
                     await send({'type': 'lifespan.startup.complete'})
                 elif message['type'] == 'lifespan.shutdown':
                     self.running = False
+                    await self.console.runner.close()
                     await self.proxy.close()
                     await self.storage.close()
                     await send({'type': 'lifespan.shutdown.complete'})
@@ -54,6 +58,7 @@ class ControlSession:
         elif scope['type'] == 'http':
             path = scope['path']
             if path == '/_autotuner' or path.startswith('/_autotuner/'):
+                if await self.console.handle(scope,receive,send):return
                 if path=='/_autotuner/cache/clear' and scope['method']=='POST':
                     self.proxy.cache.invalidate()
                     return await json_response(send,200,dict(schema_version=1,session_id=self.session_id,cleared=True,cache=self.proxy.cache.status()))
@@ -90,7 +95,7 @@ class ControlSession:
                     if path.endswith('/insights'):
                         result = analyze(self.config, self.proxy.metrics, self.proxy.upstream_metrics,
                                          transport=self.proxy.counters, storage=self.storage.health(), window=window)
-                        result.update(session_id=self.session_id, config_digest=self.storage.digest, phase=8,cache=self.proxy.cache.status())
+                        result.update(session_id=self.session_id, config_digest=self.storage.digest, phase=9,cache=self.proxy.cache.status())
                         for item in result['cache_suitability']:
                             policy=self.proxy.cache.rule(item['operation'].split(' ',1)[1])
                             if policy is not None:

@@ -7,6 +7,9 @@ import os
 from pathlib import Path
 import socket
 import sys
+import time
+import uuid
+import webbrowser
 from urllib.parse import urlsplit
 import urllib.request
 import urllib.error
@@ -17,6 +20,7 @@ from .product_config import ProductConfig
 from .session import ControlSession
 from .storage import config_identity, connect_readonly, history, report
 from .reporting import serialize_report
+from .scenarios import load_scenario
 
 VERSION = '2.0.0'
 
@@ -77,12 +81,22 @@ def parser():
     report_command.add_argument('--format', choices=['json', 'csv'], default='json')
     report_command.add_argument('--output', default=None)
     report_command.add_argument('--force', action='store_true')
+    dashboard=commands.add_parser('dashboard',help='Open the product dashboard of a running proxy')
+    dashboard.add_argument('--no-browser',action='store_true')
+    scenario=commands.add_parser('scenario',help='Preview or explicitly run a declarative API scenario')
+    scenario_commands=scenario.add_subparsers(dest='scenario_command',required=True)
+    preview=scenario_commands.add_parser('preview')
+    run=scenario_commands.add_parser('run')
+    for sub in (preview,run):sub.add_argument('file')
+    run.add_argument('--allow-writes',action='store_true')
+    run.add_argument('--output')
+    run.add_argument('--force',action='store_true')
     cache = commands.add_parser('cache',help='Inspect or clear the running response cache')
     cache_commands=cache.add_subparsers(dest='cache_command',required=True)
     explain=cache_commands.add_parser('explain')
     explain.add_argument('route')
     clear=cache_commands.add_parser('clear')
-    for sub in (check, serve, doctor, status, endpoints, insights, sessions, report_command, explain, clear):
+    for sub in (check, serve, doctor, status, endpoints, insights, sessions, report_command, explain, clear, dashboard, preview, run):
         sub.add_argument('--config', default=None)
         sub.add_argument('--upstream', default=None)
         sub.add_argument('--listen', default=None)
@@ -116,6 +130,18 @@ def emit(value, as_json):
     print(json.dumps(value, indent=2) if as_json else '\n'.join(f'{key}: {item}' for key, item in value.items()))
 
 
+def local_json(config,method,path,payload=None):
+    data=json.dumps(payload).encode() if payload is not None else None
+    request=urllib.request.Request('http://'+config.listen+path,data=data,method=method,
+                                  headers={'Content-Type':'application/json'} if data is not None else {})
+    opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
+    with control_open(opener,request,config.listen,10) as response:
+        try:result=json.load(response)
+        except ValueError:raise ControlError('Invalid local control JSON') from None
+    if not isinstance(result,dict) or result.get('schema_version')!=1:raise ControlError('Incompatible local control response')
+    return result
+
+
 def main(argv=None):
     args = parser().parse_args(argv)
     try:
@@ -138,6 +164,45 @@ def main(argv=None):
                     pass
                 result['upstream_check'] = 'tcp_reachable_tls_not_tested'
             emit(result, args.json)
+        elif args.command=='dashboard':
+            data=local_json(config,'GET','/_autotuner/status')
+            if not isinstance(data.get('phase'),int) or data['phase']<9 or not data.get('running'):
+                raise ControlError('Start the updated proxy before opening its dashboard')
+            url='http://'+config.listen+'/_autotuner/dashboard'
+            if not args.no_browser and not args.json:
+                if not webbrowser.open(url):print('Open the dashboard URL manually.',file=sys.stderr)
+            emit(dict(schema_version=1,url=url,session_id=data.get('session_id')),args.json)
+        elif args.command=='scenario':
+            plan=load_scenario(args.file)
+            if args.scenario_command=='preview':
+                emit(plan.preview(),args.json)
+                return 0
+            if plan.preview()['writes'] and not args.allow_writes:
+                raise ValueError('Use --allow-writes after reviewing scenario preview')
+            print(f"Scenario preview: {plan.preview()['requests']} requests, {plan.preview()['writes']} writes.",file=sys.stderr)
+            identifier=str(uuid.uuid4())
+            print('Run ID: '+identifier+' (no automatic retry if the connection is lost).',file=sys.stderr)
+            endpoint='/_autotuner/scenarios/jobs/'+identifier
+            try:
+                report_data=local_json(config,'POST','/_autotuner/scenarios/run',
+                    dict(scenario=plan.model_dump(exclude_unset=True),allow_writes=args.allow_writes,run_id=identifier))
+                while report_data.get('state')=='running':
+                    time.sleep(.25)
+                    report_data=local_json(config,'GET',endpoint)
+            except KeyboardInterrupt:
+                print('Stopping after the current request; completed writes are retained.',file=sys.stderr)
+                report_data=local_json(config,'POST','/_autotuner/scenarios/stop',dict(run_id=identifier))
+                while report_data.get('state')=='running':
+                    time.sleep(.25)
+                    report_data=local_json(config,'GET',endpoint)
+            if report_data.get('run_id')!=identifier or report_data.get('state') not in ('completed','stopped','failed','runtime_limit','interrupted'):
+                raise ControlError('Invalid scenario report')
+            if args.output:
+                with Path(args.output).open('w' if args.force else 'x',encoding='utf-8') as output:
+                    output.write(json.dumps(report_data,indent=2)+'\n')
+                print('Scenario report saved.',file=sys.stderr)
+            else:emit(report_data,args.json)
+            return 0 if report_data['state'] in ('completed','stopped') else 3
         elif args.command in ('report', 'sessions'):
             digest, _ = config_identity(config)
             if args.live:
@@ -202,7 +267,7 @@ def main(argv=None):
                     raise ControlError('Invalid local session response') from exc
             if (not isinstance(data, dict) or data.get('schema_version') != 1 or
                 not isinstance(data.get('session_id'), str) or
-                (args.command == 'status' and data.get('phase') not in (3, 4, 5, 6, 7, 8)) or
+                (args.command == 'status' and data.get('phase') not in (3, 4, 5, 6, 7, 8, 9)) or
                 (args.command == 'endpoints' and not isinstance(data.get('routes'), dict)) or
                 (args.command == 'insights' and (not isinstance(data.get('findings'), list) or not isinstance(data.get('cache_suitability'), list) or data.get('recommendations_applied') is not False))):
                 raise ControlError('Listener did not return a compatible control session')
@@ -221,6 +286,7 @@ def main(argv=None):
             logging.basicConfig(level=logging.INFO, stream=sys.stderr)
             logging.getLogger('httpx').setLevel(logging.WARNING)
             logging.getLogger('httpcore').setLevel(logging.WARNING)
+            print('Dashboard: http://'+config.listen+'/_autotuner/dashboard',file=sys.stderr)
             uvicorn.run(ControlSession(config), host=host.strip('[]'), port=int(port),
                         log_config=None, access_log=False, server_header=False, date_header=False, timeout_graceful_shutdown=args.shutdown_timeout)
         return 0

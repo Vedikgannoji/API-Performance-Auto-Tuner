@@ -17,6 +17,6 @@ jobs:
           node-version: '22'
       - run: pip install -e ".[test]"
       - run: autotuner --version
-      - run: node --test tests/workflow.test.cjs
+      - run: node --test tests/workflow.test.cjs tests/product_ui.test.cjs
       - run: python -m pytest
       - run: python -m pip wheel . --no-deps --wheel-dir dist

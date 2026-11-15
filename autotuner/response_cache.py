@@ -274,15 +274,17 @@ class ResponseCache:
         previous=self.decisions.get(rule.id,dict(origin_samples=0))
         self.decisions[rule.id]=dict(outcome=outcome,reason=reason,origin_samples=previous['origin_samples']+int(origin))
 
-    def explain(self,path):
+    def explain(self,path,*,include_session_details=True):
         rule=self.rule(path)
-        return dict(rule=rule.model_dump() if rule else None, effective_mode=effective_mode(self.config),
+        result=dict(rule=rule.model_dump() if rule else None, effective_mode=effective_mode(self.config),
                     serving_enabled=bool(rule and self.serving(rule)),
                     tuning=self.controller.evaluate(rule) if rule and rule.policy=='adaptive' else None,
-                    decision_history=[d for d in self.controller.history if rule and d['rule_id']==rule.id],
                     ttl_strategy='bounded adaptive preference; origin freshness cap enforced' if rule and rule.policy=='adaptive' else 'fixed policy minimum; origin freshness cap enforced',
                     write_in_progress=bool(rule and self.writes[rule.id]),
-                    last_decision=self.decisions.get(rule.id) if rule else None,cache=self.status())
+                    last_decision=self.decisions.get(rule.id) if rule else None)
+        if include_session_details:
+            result.update(decision_history=[d for d in self.controller.history if rule and d['rule_id']==rule.id],cache=self.status())
+        return result
 
     def status(self):
         return dict(mode=effective_mode(self.config),rules_enabled=sum(self.serving(r) for r in self.config.cache.routes),entries=len(self.entries),accounted_bytes=self.used_bytes,

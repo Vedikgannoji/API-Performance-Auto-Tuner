@@ -1,0 +1,157 @@
+{
+  "$defs": {
+    "Check": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "equals": {
+          "title": "Equals"
+        }
+      },
+      "required": [
+        "field",
+        "equals"
+      ],
+      "title": "Check",
+      "type": "object"
+    },
+    "Step": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "default": "GET",
+          "enum": [
+            "GET",
+            "HEAD",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "OPTIONS"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "maxProperties": 32,
+          "title": "Headers",
+          "type": "object"
+        },
+        "body": {
+          "default": null,
+          "title": "Body"
+        },
+        "include_response": {
+          "default": false,
+          "title": "Include Response",
+          "type": "boolean"
+        },
+        "timeout_seconds": {
+          "default": 30,
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "name": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "expect_status": {
+          "default": 200,
+          "maximum": 599,
+          "minimum": 100,
+          "title": "Expect Status",
+          "type": "integer"
+        },
+        "capture": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "maxProperties": 20,
+          "title": "Capture",
+          "type": "object"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/Check"
+          },
+          "maxItems": 20,
+          "title": "Checks",
+          "type": "array"
+        },
+        "repeat": {
+          "default": 1,
+          "maximum": 20,
+          "minimum": 1,
+          "title": "Repeat",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "name"
+      ],
+      "title": "Step",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "name": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "cycles": {
+      "default": 1,
+      "maximum": 10,
+      "minimum": 1,
+      "title": "Cycles",
+      "type": "integer"
+    },
+    "delay_ms": {
+      "default": 0,
+      "maximum": 5000,
+      "minimum": 0,
+      "title": "Delay Ms",
+      "type": "integer"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/Step"
+      },
+      "maxItems": 100,
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    }
+  },
+  "required": [
+    "name",
+    "steps"
+  ],
+  "title": "Scenario",
+  "type": "object"
+}
