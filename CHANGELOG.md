@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Wait for bounded server-side completion before benchmark checkpoints; keep leaks and accounting mismatches as failures.
 - Fix cache waiter counts when lock acquisition is deferred, including on Python 3.11.
 - Use product features and version information in public documentation and session metadata.
 - Advertise supported capabilities while remaining compatible with older local servers.

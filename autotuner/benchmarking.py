@@ -214,6 +214,24 @@ async def control(client,path):
     except (httpx.HTTPError,ValueError):raise RuntimeError('Benchmark control response failed validation') from None
 
 
+async def completion_status(client,expected,*,clock=None,timeout=5,max_polls=100):
+    """Observe post-response cleanup outside timed load; never accept an unsettled snapshot."""
+    clock=clock or perf_counter
+    started=clock();deadline=started+timeout;status=None;polls=0
+    for _ in range(max_polls):
+        remaining=deadline-clock()
+        if remaining<=0:break
+        try:status=await asyncio.wait_for(control(client,'/_autotuner/status'),remaining)
+        except asyncio.TimeoutError:break
+        polls+=1
+        if (status['transport']['completed_requests']==expected and status['runtime']['in_flight']==0
+                and status['runtime'].get('hot_reads',0)==0 and status['cache']['coordination_keys']==0):
+            return status,dict(state='settled',polls=polls,wait_ms=max(0,clock()-started)*1000)
+        await asyncio.sleep(0)  # Scheduling yield only; no time-based settling assumption.
+    if status is None:raise RuntimeError('Benchmark completion status timed out')
+    return status,dict(state='unsettled',polls=polls,wait_ms=max(0,clock()-started)*1000)
+
+
 async def measure(base,origin,options,workload,*,proxy=None,fixture=None,transport=None,origin_transport=None):
     """Warm SQL outside the proxy, leaving policy learning inside measured costs."""
     async with httpx.AsyncClient(base_url=origin,transport=origin_transport,trust_env=False,timeout=60) as origin_client:
@@ -239,12 +257,12 @@ async def measure(base,origin,options,workload,*,proxy=None,fixture=None,transpo
                   peak_proxy_rss_bytes=peak)
     if proxy:
         async with httpx.AsyncClient(base_url=base,trust_env=False,timeout=60,transport=transport) as client:
-            status=await control(client,'/_autotuner/status')
+            status,settlement=await completion_status(client,result['requests'])
             persisted=await control(client,'/_autotuner/report')
-        result.update(cache=status['cache'],transport=status['transport'],storage=persisted['sampling'],runtime=status['runtime'])
+        result.update(cache=status['cache'],transport=status['transport'],storage=persisted['sampling'],runtime=status['runtime'],settlement=settlement)
         result['monitoring_reconciled']=status['transport']['completed_requests']==result['requests']
     else:result['monitoring_reconciled']=True
-    result['correctness_passed']=not result['unexpected_failures'] and result['monitoring_reconciled']
+    result['correctness_passed']=not result['unexpected_failures'] and result['monitoring_reconciled'] and (not proxy or settlement['state']=='settled')
     return result
 
 
@@ -353,9 +371,9 @@ def run_soak(options,report,*,progress,child_factory):
                 result=await load(proxy.url,options,'soak',start_version=state_version)
                 state_version=result['final_version'];total+=result['requests'];unexpected+=result['unexpected_failures']
                 expected_errors+=result['errors']
-                status=await control(client,'/_autotuner/status')
+                status,settlement=await completion_status(client,total)
                 checkpoints.append(dict(elapsed_seconds=perf_counter()-started,requests=total,unexpected_failures=unexpected,rss_bytes=rss(proxy.process.pid),
-                    cache=status['cache'],runtime=status['runtime'],storage=status['storage'],transport=status['transport']))
+                    cache=status['cache'],runtime=status['runtime'],storage=status['storage'],transport=status['transport'],settlement=settlement))
                 checkpoint_count+=1
                 progress(f'Soak: {int(perf_counter()-started)} s, {total} requests, {unexpected} unexpected failures')
             persisted=await control(client,'/_autotuner/report')
@@ -383,7 +401,7 @@ def run_soak(options,report,*,progress,child_factory):
     points=result['checkpoints'];late=points[len(points)//2:]
     values=[p['rss_bytes'] for p in late]
     growth=max(values)-values[0] if values and all(v is not None for v in values) else None
-    settled=all(p['runtime']['in_flight']==0 and p['cache']['coordination_keys']==0 and
+    settled=all(p['settlement']['state']=='settled' and p['runtime']['in_flight']==0 and p['cache']['coordination_keys']==0 and
         p['cache']['peak_accounted_bytes']<=p['cache']['byte_budget'] for p in points)
     task_growth=max(p['runtime']['active_tasks'] for p in late)-late[0]['runtime']['active_tasks'] if late else None
     observed_mixture=bool(points and points[-1]['cache']['hits'] and points[-1]['cache']['misses'] and

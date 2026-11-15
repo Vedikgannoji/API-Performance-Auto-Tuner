@@ -261,25 +261,29 @@ def test_benchmark_cli_has_no_user_upstream_and_reserves_output_before_traffic(t
     assert runner.call_args.args[0].duration_seconds==1800
 
 
-@pytest.mark.parametrize('mode',('short','full','failure','growth','storage_fault'))
+@pytest.mark.parametrize('mode',('short','full','failure','growth','storage_fault','delayed_completion','unsettled'))
 def test_soak_orchestration_checkpoints_limits_and_qualification_states(tmp_path,monkeypatch,mode):
-    clock=[0.];FakeChild.all=[]
+    clock=[0.];FakeChild.all=[];pending=[False]
     async def load(*args,**kwargs):
-        clock[0]+=60
+        clock[0]+=60;pending[0]=mode=='delayed_completion'
         return dict(final_version=1,requests=20,errors=1,unexpected_failures=int(mode=='failure'))
     async def control(client,path):
         if path.endswith('report'):return {'sampling':{'state':'degraded' if mode=='storage_fault' else 'ready',
             'persistent':mode!='storage_fault','write_errors':int(mode=='storage_fault')}}
+        busy=mode=='unsettled' or pending[0];pending[0]=False
         return dict(cache=dict(coordination_keys=0,accounted_bytes=100,peak_accounted_bytes=100,byte_budget=1000,hits=10,misses=10,invalidations=1),
-            runtime=dict(in_flight=0,active_tasks=2 if mode!='growth' else int(clock[0])),storage={},transport={'completed_requests':int(clock[0]/60)*20})
+            runtime=dict(in_flight=int(busy),active_tasks=2 if mode!='growth' else int(clock[0])),storage={},transport={'completed_requests':int(clock[0]/60)*20-int(busy)})
     monkeypatch.setattr(b,'load',load);monkeypatch.setattr(b,'control',control)
     monkeypatch.setattr(b,'perf_counter',lambda:clock[0]);monkeypatch.setattr(b,'rss',lambda pid:100)
     report=b.run(b.Options(profile='soak',orders=8,duration_seconds=1 if mode=='short' else 1800),child_factory=FakeChild)
     assert report['graceful_shutdown'] and all(p.closed for p in FakeChild.all)
     state=report['gates']['stability_30_minutes']['state']
-    assert state==('not_qualified' if mode=='short' else 'passed' if mode in ('full','storage_fault') else 'failed')
+    assert state==('not_qualified' if mode=='short' else 'passed' if mode in ('full','storage_fault','delayed_completion') else 'failed')
     assert report['gates']['telemetry_health']['state']==('failed' if mode=='storage_fault' else 'passed')
     if mode=='storage_fault':assert b.exit_code(report)==3
+    if mode=='unsettled':assert b.exit_code(report)==3
+    if mode=='delayed_completion':
+        assert all(p['settlement']['polls']==2 and p['settlement']['state']=='settled' for p in report['soak']['checkpoints'])
     assert report['soak']['requests']>0 and 'soak,1,soak,adaptive' in b.report_csv(report)
     proxy=next(p for p in FakeChild.all if p.kind=='proxy')
     assert proxy.config['limits']['cache_bytes']==65536 and proxy.config['metrics']['raw_capacity']==128

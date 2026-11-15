@@ -1,0 +1,69 @@
+{
+  "scope": "benchmark_checkpoint_settlement",
+  "verified_on": "2026-11-15",
+  "status": "local_fix_verified_hosted_recheck_pending",
+  "baseline_commit": "f538a589f51a9195dce5a2aa3816d3832f6e2ddd",
+  "evidence": {
+    "file": "soak-smoke.json",
+    "ci_run": 43732273878,
+    "job": 132867124604,
+    "platform": "macOS/Python 3.11",
+    "requests": 200,
+    "unexpected_failures": 0,
+    "storage_write_errors": 0,
+    "graceful_shutdown": true,
+    "final_monitoring_reconciled": true,
+    "transient_client_server_count_pairs": [
+      [
+        60,
+        59
+      ],
+      [
+        100,
+        99
+      ],
+      [
+        140,
+        139
+      ]
+    ]
+  },
+  "change": "Read-only bounded completion observation before each paired/soak checkpoint, with settlement metadata; persistent leaks remain failures",
+  "tests": {
+    "focused_passed": 59,
+    "focused_command": ".venv/Scripts/python.exe scripts/test_socketless.py tests/test_checkpoint_settlement.py tests/test_qualification.py tests/test_overhead_regression.py -o addopts=\"\" --tb=short",
+    "full_passed": 527,
+    "full_command": ".venv/Scripts/python.exe scripts/test_socketless.py --junitxml=tmp/settlement-tests.xml --tb=short",
+    "full_seconds": 61.65,
+    "failed": 0,
+    "core_statements_percent": 100,
+    "core_branches_percent": 100
+  },
+  "coverage": {
+    "covered_lines": 3057,
+    "num_statements": 3100,
+    "percent_covered": 97.57281553398059,
+    "percent_covered_display": "98",
+    "missing_lines": 43,
+    "excluded_lines": 7,
+    "percent_statements_covered": 98.61290322580645,
+    "percent_statements_covered_display": "99",
+    "num_branches": 1020,
+    "num_partial_branches": 45,
+    "covered_branches": 963,
+    "missing_branches": 57,
+    "percent_branches_covered": 94.41176470588235,
+    "percent_branches_covered_display": "94"
+  },
+  "limits": {
+    "completion_deadline_seconds": 5,
+    "maximum_status_polls": 100
+  },
+  "boundaries": [
+    "Local Python 3.12 managed Windows socketless verification with controlled completion races",
+    "No workload retries, discarded latency samples or relaxed correctness/storage/stability gates",
+    "Real macOS and other hosted checks require rerun after push",
+    "A two-second soak remains insufficient for 30-minute stability qualification",
+    "No commit, push, tag or published-asset modification performed"
+  ]
+}

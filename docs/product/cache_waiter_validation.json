@@ -2,7 +2,7 @@
   "scope": "cache_waiter_compatibility",
   "verified_on": "2026-11-15",
   "baseline_commit": "269eefe0d77eaad1878a3463b4239f29d039463b",
-  "status": "local_fix_verified_hosted_recheck_pending",
+  "status": "hosted_waiter_fix_confirmed_separate_soak_issue_identified",
   "ci_failure": {
     "run_id": 43730587474,
     "commit": "be2eb1ae72d5d7ac05d79ef3c323c430f471e348",
@@ -58,8 +58,16 @@
   "limitations": [
     "Local tests use Python 3.12 and the managed Windows socketless runner",
     "Python 3.11 is not installed locally; deferred scheduling is reproduced deterministically",
-    "Hosted 3.11/3.12/3.13 CI must execute against the fix after push",
     "No tests, assertions, supported versions or coverage gates were removed",
     "Published release assets and tags were not modified"
-  ]
+  ],
+  "hosted_review": {
+    "verified_on": "2026-11-15",
+    "commit": "f538a589f51a9195dce5a2aa3816d3832f6e2ddd",
+    "run_id": 43732273878,
+    "python_test_matrix": "passed on Windows/Linux/macOS with Python 3.11, 3.12 and 3.13",
+    "complete_jobs_passed": 8,
+    "complete_jobs_failed": 1,
+    "remaining_failure": "macOS/Python 3.11 two-second soak checkpoint race; see benchmark_checkpoint_validation.json"
+  }
 }
