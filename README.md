@@ -1,10 +1,10 @@
 # API Performance Auto Tuner
 
-Local API observation proxy, dashboard and explicitly approved public-read caching. **2.0.0b2 is a Phase 11 checkpoint prerelease candidate; full performance qualification and registry publication remain pending.**
+Local API monitoring, performance insights and adaptive response caching. **Autotuner v2.0.0-beta.2 is a preview release; full performance qualification and package-registry publication remain pending.**
 
 Observe latency, throughput, errors and queueing. Opt into fixed or adaptive response caching with route rules and dependent-write invalidation. Inspect policy decisions, execute ordered API scenarios and export bounded persistent telemetry.
 
-This checkpoint preserves the Phase 1–11 feature set. Project API discovery, interactive terminal menus and the guided optimization lifecycle belong to the [Phase 12–17 roadmap](docs/product/POST_PHASE_11_STABILIZATION.md). See the [checkpoint release notes](docs/release/v2.0.0b2.md).
+Configure your upstream API, inspect its performance and enable approved cache policies. Project API discovery, interactive terminal menus and a guided optimization lifecycle are planned. See the [release notes](docs/release/v2.0.0b2.md).
 
 ## Install from source
 
@@ -89,4 +89,4 @@ autotuner release check --evidence docs/release/candidate.json --json
 
 Keep dist limited to one wheel. The pending release check deliberately exits **3**. Node is needed for JavaScript checks. In the managed Windows sandbox only, use `python scripts/test_socketless.py` instead of pytest; it does not qualify real TCP.
 
-See [release preparation](docs/product/PHASE_11_RELEASE_PREPARATION.md), [contributing](CONTRIBUTING.md), [security](SECURITY.md) and [changelog](CHANGELOG.md). License and publisher identity await owner approval; no license grant or public package availability is implied.
+See [contributing](CONTRIBUTING.md), [security](SECURITY.md) and [changelog](CHANGELOG.md). License and publisher identity await owner approval; no license grant or public package availability is implied.

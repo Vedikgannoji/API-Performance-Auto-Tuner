@@ -1,0 +1,51 @@
+{
+  "scope": "public_content_cleanup",
+  "verified_on": "2026-11-15",
+  "status": "verified",
+  "changes": [
+    "Feature-based public documentation and release notes",
+    "Version and capability metadata instead of internal milestones",
+    "Backward-compatible CLI support for older local servers without exposing milestone fields"
+  ],
+  "internal_development_records_preserved": true,
+  "published_assets_modified": false,
+  "tests": {
+    "focused": 186,
+    "full": 513,
+    "javascript": 19,
+    "failed": 0,
+    "full_seconds": 175.54,
+    "focused_command": ".venv/Scripts/python.exe scripts/test_socketless.py tests/test_public_metadata.py tests/test_cli.py tests/test_console.py tests/test_insights.py tests/test_response_cache.py tests/test_storage.py -o addopts=\"\" --tb=short",
+    "full_command": ".venv/Scripts/python.exe scripts/test_socketless.py --junitxml=tmp/public-content-tests.xml --tb=short",
+    "javascript_command": "node --test tests/workflow.test.cjs tests/product_ui.test.cjs"
+  },
+  "coverage": {
+    "covered_lines": 3043,
+    "num_statements": 3086,
+    "percent_covered": 97.55978526110297,
+    "percent_covered_display": "98",
+    "missing_lines": 43,
+    "excluded_lines": 7,
+    "percent_statements_covered": 98.60661049902787,
+    "percent_statements_covered_display": "99",
+    "num_branches": 1012,
+    "num_partial_branches": 45,
+    "covered_branches": 955,
+    "missing_branches": 57,
+    "percent_branches_covered": 94.36758893280633,
+    "percent_branches_covered_display": "94"
+  },
+  "core_statement_percent": 100,
+  "core_branch_percent": 100,
+  "packaging": {
+    "builds": "wheel and sdist passed via setuptools backend",
+    "twine": "both passed",
+    "installed_smoke": "target install with existing dependencies passed: runtime source match, dashboard, scenarios, cache, RAM demo and ASGI benchmark correctness",
+    "public_content": "wheel metadata and sdist public docs match workspace and contain no internal milestone labels"
+  },
+  "limitations": [
+    "Managed Windows socketless verification; no new real HTTP qualification",
+    "Existing GitHub release description and published assets not modified",
+    "Runtime source changes require fresh evidence before qualified publication"
+  ]
+}

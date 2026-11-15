@@ -1,4 +1,4 @@
-"""Phase 11 proxy session and loopback control endpoints."""
+"""Proxy session and loopback control endpoints."""
 import asyncio
 from time import perf_counter
 import uuid
@@ -9,6 +9,7 @@ from .storage import TelemetryStorage, StorageUnavailable
 from .core.insights import analyze
 from .response_cache import effective_mode
 from .console import Console
+from ._version import __version__
 
 
 class ControlSession:
@@ -35,7 +36,8 @@ class ControlSession:
     def status(self):
         try:active_tasks=len(asyncio.all_tasks())
         except RuntimeError:active_tasks=None
-        return dict(schema_version=1, session_id=self.session_id, phase=11,
+        return dict(schema_version=1, session_id=self.session_id, tool_version=__version__,
+                    capabilities=['proxy','dashboard','scenarios','insights','cache','reports'],
                     uptime_seconds=max(0,perf_counter()-self.started_monotonic),
                     runtime=dict(in_flight=self.proxy.in_flight,hot_reads=self.proxy.hot_reads,active_tasks=active_tasks),
                     mode=self.config.mode, effective_mode=effective_mode(self.config), running=self.running,
@@ -102,7 +104,7 @@ class ControlSession:
                     if path.endswith('/insights'):
                         result = analyze(self.config, self.proxy.metrics, self.proxy.upstream_metrics,
                                          transport=self.proxy.counters, storage=self.storage.health(), window=window)
-                        result.update(session_id=self.session_id, config_digest=self.storage.digest, phase=11,cache=self.proxy.cache.status())
+                        result.update(session_id=self.session_id, config_digest=self.storage.digest, tool_version=__version__,cache=self.proxy.cache.status())
                         for item in result['cache_suitability']:
                             policy=self.proxy.cache.rule(item['operation'].split(' ',1)[1])
                             if policy is not None:

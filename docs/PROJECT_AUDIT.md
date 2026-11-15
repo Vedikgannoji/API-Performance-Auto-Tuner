@@ -82,9 +82,9 @@ Build a modular monolith: FastAPI routers and schemas, business services, databa
 
 Suggested meaningful business operations (12): GET/POST /users; GET/PATCH /users/{id}; GET/POST /products; GET/PATCH /products/{id}; GET/POST /orders; GET /orders/{id}; PATCH /orders/{id}/status. Establish validation, persistence, not-found behavior and mutation invalidation. Monitor all 12; cache only explicitly eligible reads. Control/health routes remain separate.
 
-## Phases and exit criteria
+## Work areas and exit criteria
 
-| Phase | Work | Exit criterion |
+| Area | Work | Exit criterion |
 | --- | --- | --- |
 | 0: Baseline and specification | Run current guide, record defects, choose metric/error/window definitions and backend direction | Reproducible defect results; agreed contracts |
 | 1: Working backend | FastAPI structure, schemas, persistence, 12 business operations, config and error envelopes | Integration tests cover successful and invalid requests for every operation |

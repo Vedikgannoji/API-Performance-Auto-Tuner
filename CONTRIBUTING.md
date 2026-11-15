@@ -1,6 +1,6 @@
 # Contributing
 
-Follow AGENTS.md and docs/product phase contracts. Install `.[test,benchmark,release]` in a Python virtual environment and Node 22 for UI checks.
+Follow AGENTS.md and the internal development contracts in docs/product. Install `.[test,benchmark,release]` in a Python virtual environment and Node 22 for UI checks.
 
 Run `python -m pytest`, `python -m autotuner.quality coverage.json`, and `node --test tests/workflow.test.cjs tests/product_ui.test.cjs`. For packaging changes run `python -m build`, `python -m twine check dist/*` and `python scripts/smoke_wheel.py dist`. Keep dist limited to one candidate wheel.
 

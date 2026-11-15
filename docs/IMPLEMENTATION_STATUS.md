@@ -2,14 +2,14 @@
 
 Updated 14 November 2026. The original audit describes the previous Express prototype. The default documented runtime is now FastAPI; legacy Node files remain untouched for reference.
 
-| Phase | Result |
+| Area | Result |
 | --- | --- |
-| 1. Persistent backend | Complete: SQLite, strict schemas, users/products/orders/sales report; 13 business operations |
-| 2. Monitoring | Complete: all business responses, errors and cache hits; normalized route labels; bounded observations; windowed RPS, errors and percentiles |
-| 3. Safe cache | Complete: explicit eligible reads, credential bypass, bounded TTL/LRU, mutation invalidation, concurrent miss coordination and cancellation handling |
-| 4. Adaptive rules/analytics | Complete: origin latency and reuse drive cache activation/TTL; failure rollback, cooldown, decision history, disjoint-cohort regressions |
-| 5. Tests and quality gate | Verified locally: 55 tests pass; 100% statement and branch coverage across all core Python modules; 90% combined floor enforced; CI workflow added but not run remotely |
-| 6. Performance evidence | Runner implemented and its correctness contract tested; real HTTP latency reduction remains unverified because sandbox localhost connections are denied |
+| Persistent backend | Complete: SQLite, strict schemas, users/products/orders/sales report; 13 business operations |
+| Monitoring | Complete: all business responses, errors and cache hits; normalized route labels; bounded observations; windowed RPS, errors and percentiles |
+| Safe cache | Complete: explicit eligible reads, credential bypass, bounded TTL/LRU, mutation invalidation, concurrent miss coordination and cancellation handling |
+| Adaptive rules/analytics | Complete: origin latency and reuse drive cache activation/TTL; failure rollback, cooldown, decision history, disjoint-cohort regressions |
+| Tests and quality gate | Verified locally: 55 tests pass; 100% statement and branch coverage across all core Python modules; 90% combined floor enforced; CI workflow added but not run remotely |
+| Performance evidence | Runner implemented and its correctness contract tested; real HTTP latency reduction remains unverified because sandbox localhost connections are denied |
 
 ## Resume evidence
 

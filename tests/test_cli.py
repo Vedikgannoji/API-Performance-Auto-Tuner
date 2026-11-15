@@ -89,7 +89,8 @@ def test_explicit_connect_and_status(config, monkeypatch, capsys):
     monkeypatch.setattr(cli.urllib.request, 'build_opener', Mock(return_value=Mock(open=Mock(return_value=nullcontext(io.StringIO('{"schema_version":1,"phase":3,"session_id":"abc"}'))))))
     capsys.readouterr()
     assert cli.main(['status', '--json']) == 0
-    assert json.loads(capsys.readouterr().out)['session_id'] == 'abc'
+    result=json.loads(capsys.readouterr().out)
+    assert result['session_id'] == 'abc' and 'phase' not in result
     monkeypatch.setattr(cli.urllib.request, 'build_opener', Mock(return_value=Mock(open=Mock(return_value=nullcontext(io.StringIO('{}'))))))
     assert cli.main(['status']) == 1
     monkeypatch.setattr(cli.urllib.request, 'build_opener', Mock(return_value=Mock(open=Mock(return_value=nullcontext(io.StringIO('not-json'))))))

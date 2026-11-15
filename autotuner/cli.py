@@ -148,6 +148,15 @@ def emit(value, as_json):
     print(json.dumps(value, indent=2) if as_json else '\n'.join(f'{key}: {item}' for key, item in value.items()))
 
 
+def supports(data, capability):
+    """Prefer advertised features; recognize legacy servers without exposing build milestones."""
+    if 'capabilities' in data:
+        capabilities=data['capabilities']
+        return isinstance(capabilities,list) and all(isinstance(item,str) for item in capabilities) and capability in capabilities
+    milestone=data.get('phase')
+    return type(milestone) is int and {'proxy':3,'dashboard':9}[capability]<=milestone<=11
+
+
 def local_json(config,method,path,payload=None):
     data=json.dumps(payload).encode() if payload is not None else None
     request=urllib.request.Request('http://'+config.listen+path,data=data,method=method,
@@ -226,7 +235,7 @@ def main(argv=None):
             emit(result, args.json)
         elif args.command=='dashboard':
             data=local_json(config,'GET','/_autotuner/status')
-            if not isinstance(data.get('phase'),int) or data['phase']<9 or not data.get('running'):
+            if not supports(data,'dashboard') or not data.get('running'):
                 raise ControlError('Start the updated proxy before opening its dashboard')
             url='http://'+config.listen+'/_autotuner/dashboard'
             if not args.no_browser and not args.json:
@@ -333,10 +342,11 @@ def main(argv=None):
                     raise ControlError('Invalid local session response') from exc
             if (not isinstance(data, dict) or data.get('schema_version') != 1 or
                 not isinstance(data.get('session_id'), str) or
-                (args.command == 'status' and data.get('phase') not in (3, 4, 5, 6, 7, 8, 9, 10, 11)) or
+                (args.command == 'status' and not supports(data,'proxy')) or
                 (args.command == 'endpoints' and not isinstance(data.get('routes'), dict)) or
                 (args.command == 'insights' and (not isinstance(data.get('findings'), list) or not isinstance(data.get('cache_suitability'), list) or data.get('recommendations_applied') is not False))):
                 raise ControlError('Listener did not return a compatible control session')
+            data.pop('phase',None)
             emit(data, args.json)
         else:
             if args.shutdown_timeout < 1:
