@@ -262,7 +262,9 @@ class ResponseCache:
     def coordination(self,key):
         if key not in self.locks:self.locks[key]=[asyncio.Lock(),0]
         item=self.locks[key];item[1]+=1
-        if item[0].locked():self.counters['coalesced_waiters']+=1
+        # Registrations include acquisitions queued by wait_for before the lock
+        # coroutine runs (notably on Python 3.11). Lock state alone misses them.
+        if item[1]>1:self.counters['coalesced_waiters']+=1
         return item[0]
 
     def release_coordination(self,key,acquired):

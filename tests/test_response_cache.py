@@ -247,6 +247,32 @@ def test_coalesces_cold_key_and_releases_all_coordination(config):
     asyncio.run(scenario())
 
 
+@pytest.mark.parametrize('acquire_first', [False, True])
+def test_waiter_telemetry_counts_registrations_before_acquisition(config, acquire_first):
+    """Deferred lock acquisition must produce the same telemetry as immediate acquisition."""
+    async def scenario():
+        cache=ResponseCache(config)
+        leader=cache.coordination('same-key')
+        if acquire_first:await leader.acquire()
+        followers=[cache.coordination('same-key') for _ in range(7)]
+        assert all(lock is leader for lock in followers)
+        assert leader.locked() is acquire_first
+        assert cache.counters['coalesced_waiters']==7
+        # A different key has its own leader, without adding a coalesced waiter.
+        other=cache.coordination('other-key')
+        assert other is not leader and cache.counters['coalesced_waiters']==7
+        cache.release_coordination('other-key',False)
+        # Registrations that cancel before acquisition still release their references.
+        for _ in followers:cache.release_coordination('same-key',False)
+        cache.release_coordination('same-key',acquire_first)
+        assert not cache.locks
+        next_leader=cache.coordination('same-key')
+        assert next_leader is not leader and cache.counters['coalesced_waiters']==7
+        cache.release_coordination('same-key',False)
+        assert not cache.locks
+    asyncio.run(scenario())
+
+
 def test_hot_hit_skips_saturated_upstream_and_cold_admission(config):
     config.limits.upstream_concurrency=1;config.limits.queue_capacity=1
     gate,entered,queued=asyncio.Event(),asyncio.Event(),asyncio.Event()

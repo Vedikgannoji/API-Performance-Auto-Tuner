@@ -1,0 +1,65 @@
+{
+  "scope": "cache_waiter_compatibility",
+  "verified_on": "2026-11-15",
+  "baseline_commit": "269eefe0d77eaad1878a3463b4239f29d039463b",
+  "status": "local_fix_verified_hosted_recheck_pending",
+  "ci_failure": {
+    "run_id": 43730587474,
+    "commit": "be2eb1ae72d5d7ac05d79ef3c323c430f471e348",
+    "job_ids": [
+      132861913224,
+      132861913502,
+      132861913591
+    ],
+    "python": "3.11",
+    "platforms": [
+      "Windows",
+      "Linux",
+      "macOS"
+    ],
+    "test": "test_coalesces_cold_key_and_releases_all_coordination",
+    "expected_waiters": 7,
+    "actual_waiters": 0,
+    "other_tests_passed_per_job": 500
+  },
+  "correction": "Count additional active same-key registrations independently of deferred lock acquisition",
+  "controlled_reproduction": {
+    "committed_waiter_count": 0,
+    "corrected_waiter_count": 7,
+    "registrations": 8,
+    "lock_acquired": false
+  },
+  "tests": {
+    "focused_passed": 77,
+    "focused_command": ".venv/Scripts/python.exe scripts/test_socketless.py tests/test_response_cache.py tests/test_reliability.py -o addopts=\"\" --tb=short",
+    "full_passed": 515,
+    "full_command": ".venv/Scripts/python.exe scripts/test_socketless.py --junitxml=tmp/waiter-tests.xml --tb=short",
+    "full_seconds": 137.51,
+    "failed": 0,
+    "core_statements_percent": 100,
+    "core_branches_percent": 100
+  },
+  "coverage": {
+    "covered_lines": 3043,
+    "num_statements": 3086,
+    "percent_covered": 97.55978526110297,
+    "percent_covered_display": "98",
+    "missing_lines": 43,
+    "excluded_lines": 7,
+    "percent_statements_covered": 98.60661049902787,
+    "percent_statements_covered_display": "99",
+    "num_branches": 1012,
+    "num_partial_branches": 45,
+    "covered_branches": 955,
+    "missing_branches": 57,
+    "percent_branches_covered": 94.36758893280633,
+    "percent_branches_covered_display": "94"
+  },
+  "limitations": [
+    "Local tests use Python 3.12 and the managed Windows socketless runner",
+    "Python 3.11 is not installed locally; deferred scheduling is reproduced deterministically",
+    "Hosted 3.11/3.12/3.13 CI must execute against the fix after push",
+    "No tests, assertions, supported versions or coverage gates were removed",
+    "Published release assets and tags were not modified"
+  ]
+}
