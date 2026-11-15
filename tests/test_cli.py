@@ -66,6 +66,8 @@ def test_serve_runner_and_interruption(config, monkeypatch, capsys):
     monkeypatch.setattr(uvicorn, 'run', runner)
     assert cli.main(['serve', '--listen', '[::1]:8082']) == 0
     assert runner.call_args.kwargs['host'] == '::1'
+    assert runner.call_args.kwargs['server_header'] is False
+    assert runner.call_args.kwargs['date_header'] is False
     assert runner.call_args.args[0].status()['forwarding_enabled'] is True
     assert not capsys.readouterr().out
     assert cli.main(['serve', '--json']) == 2

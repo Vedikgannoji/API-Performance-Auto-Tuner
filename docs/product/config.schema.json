@@ -206,6 +206,7 @@
           "default": "observe",
           "enum": [
             "observe",
+            "cache",
             "adaptive"
           ],
           "title": "Policy",
@@ -272,6 +273,7 @@
       "enum": [
         "observe",
         "recommend",
+        "cache",
         "adaptive"
       ],
       "title": "Mode",

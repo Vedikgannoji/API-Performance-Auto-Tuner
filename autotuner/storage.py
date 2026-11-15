@@ -103,7 +103,7 @@ def report(connection, digest, session_id=None):
     health['sampling_may_be_incomplete'] = bool(health.get('sampling_incomplete') or meta[1] is None or health.get('queue_depth'))
     health['durability_boundary'] = 'last committed writer checkpoint; pending or abrupt-exit observations may be absent'
     return dict(schema_version=1, tool_version=meta[4], session_id=session_id, config_digest=digest,
-                effective_config=json.loads(meta[2]), effective_mode='observe', started_at=utc(meta[0]),
+                effective_config=json.loads(meta[2]), effective_mode='cache' if json.loads(meta[2])['mode']=='cache' else 'observe', started_at=utc(meta[0]),
                 ended_at=utc(meta[1]) if meta[1] else None, shutdown_recorded=meta[1] is not None,
                 generated_at=utc(time()), source_sha256=meta[5], workload='observed proxy traffic; no replay or benchmark',
                 aggregation=dict(bucket_seconds=60, percentiles='exact weighted nearest rank over retained duration frequencies',

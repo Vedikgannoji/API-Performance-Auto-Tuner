@@ -1,0 +1,113 @@
+{
+  "phase": 7,
+  "status": "ready_for_joint_review",
+  "verified_on": "2026-11-15",
+  "tests": {
+    "focused": 219,
+    "full_python": 285,
+    "new_cache_cases": 73,
+    "javascript": 9,
+    "focused_command": "python scripts/test_socketless.py tests/test_response_cache.py tests/test_proxy.py tests/test_insights.py tests/test_cli.py tests/test_storage.py tests/test_product_config.py -o addopts=\"\" --tb=short",
+    "full_command": "python scripts/test_socketless.py --tb=short --junitxml=tmp/test-results.xml",
+    "javascript_command": "node --test tests/workflow.test.cjs",
+    "header_regression_focused": 86,
+    "header_regression_command": "python scripts/test_socketless.py tests/test_response_cache.py tests/test_cli.py -o addopts=\"\" --tb=short"
+  },
+  "coverage": {
+    "covered_lines": 1790,
+    "num_statements": 1811,
+    "percent_covered": 98.26784959864808,
+    "percent_covered_display": "98",
+    "missing_lines": 21,
+    "excluded_lines": 7,
+    "percent_statements_covered": 98.84041965764771,
+    "percent_statements_covered_display": "99",
+    "num_branches": 556,
+    "num_partial_branches": 16,
+    "covered_branches": 536,
+    "missing_branches": 20,
+    "percent_branches_covered": 96.40287769784173,
+    "percent_branches_covered_display": "96"
+  },
+  "cache_coverage": {
+    "covered_lines": 212,
+    "num_statements": 212,
+    "percent_covered": 100.0,
+    "percent_covered_display": "100",
+    "missing_lines": 0,
+    "excluded_lines": 0,
+    "percent_statements_covered": 100.0,
+    "percent_statements_covered_display": "100",
+    "num_branches": 90,
+    "num_partial_branches": 0,
+    "covered_branches": 90,
+    "missing_branches": 0,
+    "percent_branches_covered": 100.0,
+    "percent_branches_covered_display": "100"
+  },
+  "packaging": {
+    "wheel": "api_performance_auto_tuner-2.0.0-py3-none-any.whl",
+    "sha256": "a18c9346e3d85aad475aef540714b10845cd8608418b798c0e797937b5060339",
+    "packaged_sources_match_workspace": true,
+    "isolated_install": "Updated header-fix wheel: init, serve-check and cache-explain help passed; earlier Phase 7 core fill/hit/invalidation smoke remains covered by full pytest.",
+    "dependencies": "Existing environment dependencies; not a fresh dependency installation",
+    "installed_header_fix_smoke": "Passed init, serve-check and cache-explain help from isolated target; existing environment dependencies"
+  },
+  "behavior": [
+    "Global cache mode AND explicit cache policy required; adaptive remains inactive",
+    "Privacy, variants, freshness, Age, compression and framing corpus",
+    "Strict representation accounting includes staging and retired pinned entries",
+    "Coalesced cold reads and hot-hit admission under saturation",
+    "Declared dependencies evicted before and after writes, including failure/cancellation",
+    "Generation changes and clear prevent stale in-flight refill",
+    "Cancelled leaders/waiters/hits release coordination and reservations",
+    "RAM-only ASGI fixture demonstrates product/report dependency invalidation",
+    "Degraded telemetry preserves forwarding/cache correctness",
+    "Persisted reports retain cache outcome aggregates and effective mode"
+  ],
+  "limitations": [
+    "Socketless managed Windows runner; mock and in-process ASGI transports",
+    "Normal-terminal HTTP caching, invalidation and restart review pending",
+    "Fixed policy-minimum TTL only; automatic tuning is Phase 8",
+    "Single-worker invalidation requires relevant writes through this proxy; external writes are not coordinated",
+    "Logical representation-byte budget is not an RSS measurement",
+    "Only explicit supported freshness directives; unsupported semantics bypass",
+    "No causal speedup, real HTTP overhead or cross-platform qualification claimed"
+  ],
+  "source_sha256": {
+    "autotuner/cache.py": "258666f564d89e514465bad746b90bb80781930306eac1934a185322502a8449",
+    "autotuner/cli.py": "af7b0e657ded1b11c19e1b7fbd6f806c29e421d14287d297da842a8b4a6c0ed4",
+    "autotuner/dashboard.html": "fb57e52468201182adc287c8b5261b989145c169a154daf0e6e0165383fb9c4e",
+    "autotuner/database.py": "99fea81ca0757a0f289533e6e98657bf818f971b2efcaf492c0d057bc7a042f4",
+    "autotuner/main.py": "169beaee737b8957b69e0b2e21cfe121f3a9707902ff79a9b0ff55616ef2c6b8",
+    "autotuner/metrics.py": "85df644ef01ce70ce7dcfcd60e51a483670787dbbd45e944179178c597f30e8f",
+    "autotuner/product_config.py": "0829a878a8b461d34ad55ab1a11082b1ff2ffb6bb4bc82b89e0f2da51f65ee9a",
+    "autotuner/proxy.py": "04510efbec49485a8e7320e17d8e842ce9205327f7ff267924392ca8a19cb717",
+    "autotuner/reporting.py": "e21bec89da24c5a6468711e7cd5f240655f4be60e2ed02aca5a940860612ae78",
+    "autotuner/response_cache.py": "230d7eaca5702a2baabbe85d2517c1737a518440ee97c9e814fd28d0a363b27a",
+    "autotuner/schemas.py": "0306b6c444cabb1e5379abb01aff603c144d188a19d9efdbc698cb8322fe8e29",
+    "autotuner/session.py": "3b80eacd4b7e0871b67a73d6a8ce1fc5b5b5e589bab91dc81c98511d913254b3",
+    "autotuner/storage.py": "a3ee77b1aca556b207afbeeb850c959b182cef987c57320375766691ba9a00b0",
+    "autotuner/workflow.js": "0ca385617f52c7124250b5b7a794e2eef0b84750941cd0715b52ba23676f61cd",
+    "autotuner/__init__.py": "3fabac76430f0af6f9a9822c1e131b9a2ee992851de26db345019af804653e3a",
+    "autotuner/__main__.py": "0dd072ac4488f65bf8c5864ce7a52efa1498fe3fe980353e07f148507de7c735",
+    "autotuner/core/cache.py": "c800383026e72c8813d59e69f97b4a253b6dd9ae74f8ce4e013d6178c4cdf70e",
+    "autotuner/core/contracts.py": "895a19767dcac0c76887a6360e01a1a83c47e4f0faf1f92f9f03716c123b6713",
+    "autotuner/core/engine.py": "f309d391663fdbe8d941117c42501d02c445ae81d865d3fe02952d4ada03c2c2",
+    "autotuner/core/insights.py": "9819da5dd992a2da7f5dd1e902c9291f1b1f806ea98ce9369eec4efbb78ab659",
+    "autotuner/core/metrics.py": "559e10821dce47fac2fd070acace9bd818de33c800e5f25b69cf85fed2e74eed",
+    "autotuner/core/monitoring.py": "1abee374d2ca3f40206b292fa9271e95c63f527550d6527b3106bcfaca413b0d",
+    "autotuner/core/__init__.py": "3cdcabf194fdc872bbe873acf07d95e33e7a8a1422964b73137e06d30b40ec49"
+  },
+  "fixture_sha256": {
+    "examples/cache-demo.json": "86bd70fc25ac1e365aaccc85719fe55b0120f5ac642333321498bb1edac6336a",
+    "examples/cache_upstream.py": "e5f3efac901b7b18bd0a9935ccf2d2abb4d621fee396f8f0e1961710c857ba0a",
+    "examples/cache-price-update.json": "ec1056b4a1a0e10230f15fb78b2b69bd9189d8972ba42387e6a3cfe1065657e3"
+  },
+  "joint_review": {
+    "observed": "User verified real HTTP MISS then HIT with identical JSON.",
+    "issue": "Duplicate Date and Server from proxy defaults plus upstream fields.",
+    "correction": "Disable Uvicorn automatic Date/Server in proxy CLI; synthesize application Date only when absent.",
+    "normal_terminal_header_recheck": "pending user restart and curl -i"
+  }
+}

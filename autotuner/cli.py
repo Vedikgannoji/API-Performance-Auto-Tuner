@@ -25,7 +25,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def parser():
-    root = argparse.ArgumentParser(prog='autotuner', description='Local API observation proxy. Shared response caching is not enabled.')
+    root = argparse.ArgumentParser(prog='autotuner', description='Local API proxy with opt-in fixed-TTL caching; observe by default.')
     root.add_argument('--version', action='version', version='autotuner ' + VERSION)
     commands = root.add_subparsers(dest='command', required=True)
     init = commands.add_parser('init', help='Create an observe-mode JSON configuration')
@@ -54,11 +54,16 @@ def parser():
     report_command.add_argument('--format', choices=['json', 'csv'], default='json')
     report_command.add_argument('--output', default=None)
     report_command.add_argument('--force', action='store_true')
-    for sub in (check, serve, doctor, status, endpoints, insights, sessions, report_command):
+    cache = commands.add_parser('cache',help='Inspect or clear the running response cache')
+    cache_commands=cache.add_subparsers(dest='cache_command',required=True)
+    explain=cache_commands.add_parser('explain')
+    explain.add_argument('route')
+    clear=cache_commands.add_parser('clear')
+    for sub in (check, serve, doctor, status, endpoints, insights, sessions, report_command, explain, clear):
         sub.add_argument('--config', default=None)
         sub.add_argument('--upstream', default=None)
         sub.add_argument('--listen', default=None)
-        sub.add_argument('--mode', choices=['observe', 'recommend', 'adaptive'], default=None)
+        sub.add_argument('--mode', choices=['observe', 'recommend', 'cache', 'adaptive'], default=None)
         sub.add_argument('--json', action='store_true')
     return root
 
@@ -145,6 +150,21 @@ def main(argv=None):
                     print('Report saved.', file=sys.stderr)
                 else:
                     sys.stdout.write(content)
+        elif args.command=='cache':
+            from urllib.parse import urlencode
+            endpoint='/_autotuner/cache/'+args.cache_command
+            if args.cache_command=='explain':
+                if not args.route.startswith('/') or len(args.route)>1024 or any(c in args.route for c in ('?','#','\x00')):
+                    raise ValueError('Expected a route path')
+                endpoint+='?'+urlencode({'path':args.route})
+            opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
+            request=urllib.request.Request('http://'+config.listen+endpoint,method='POST' if args.cache_command=='clear' else 'GET')
+            with opener.open(request,timeout=2) as response:
+                try:data=json.load(response)
+                except ValueError:raise OSError('Invalid cache control response') from None
+            if not isinstance(data,dict) or data.get('schema_version')!=1 or not isinstance(data.get('session_id'),str) or not isinstance(data.get('cache'),dict):
+                raise OSError('Incompatible cache control session')
+            emit(data,args.json)
         elif args.command in ('status', 'endpoints', 'insights'):
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
             endpoint = '/_autotuner/status'
@@ -159,7 +179,7 @@ def main(argv=None):
                     raise OSError('Invalid local session response') from exc
             if (not isinstance(data, dict) or data.get('schema_version') != 1 or
                 not isinstance(data.get('session_id'), str) or
-                (args.command == 'status' and data.get('phase') not in (3, 4, 5, 6)) or
+                (args.command == 'status' and data.get('phase') not in (3, 4, 5, 6, 7)) or
                 (args.command == 'endpoints' and not isinstance(data.get('routes'), dict)) or
                 (args.command == 'insights' and (not isinstance(data.get('findings'), list) or not isinstance(data.get('cache_suitability'), list) or data.get('recommendations_applied') is not False))):
                 raise OSError('Listener did not return a compatible control session')
@@ -174,12 +194,12 @@ def main(argv=None):
                 raise ValueError('Use serve --check --json or status --json; foreground serve emits diagnostics on stderr')
             import uvicorn
             host, port = config.listen.rsplit(':', 1)
-            print('Observation proxy enabled; shared cache serving is disabled until its dedicated phase.', file=sys.stderr)
+            print('Proxy enabled; fixed-TTL caching is opt-in through cache mode and explicit cache rules. Adaptive tuning is not enabled.',file=sys.stderr)
             logging.basicConfig(level=logging.INFO, stream=sys.stderr)
             logging.getLogger('httpx').setLevel(logging.WARNING)
             logging.getLogger('httpcore').setLevel(logging.WARNING)
             uvicorn.run(ControlSession(config), host=host.strip('[]'), port=int(port),
-                        log_config=None, access_log=False, timeout_graceful_shutdown=args.shutdown_timeout)
+                        log_config=None, access_log=False, server_header=False, date_header=False, timeout_graceful_shutdown=args.shutdown_timeout)
         return 0
     except ValidationError as exc:
         locations = ['.'.join(map(str, item['loc'])) or 'configuration' for item in exc.errors(include_input=False)]

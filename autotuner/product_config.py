@@ -63,7 +63,7 @@ class RoutePolicy(Contract):
     id: Annotated[str, Field(pattern=r'^[a-z][a-z0-9-]{0,63}$')]
     match: Pattern
     methods: list[Literal['GET']] = Field(default_factory=lambda: ['GET'], min_length=1, max_length=1)
-    policy: Literal['observe', 'adaptive'] = 'observe'
+    policy: Literal['observe', 'cache', 'adaptive'] = 'observe'
     ttl_min_seconds: Positive = 2
     ttl_max_seconds: Positive = 30
     vary_headers: list[Literal['Accept', 'Accept-Encoding']] = Field(default_factory=list)
@@ -101,7 +101,7 @@ class ProductConfig(Contract):
     schema_version: Literal[1] = 1
     upstream: str
     listen: str = '127.0.0.1:8080'
-    mode: Literal['observe', 'recommend', 'adaptive'] = 'observe'
+    mode: Literal['observe', 'recommend', 'cache', 'adaptive'] = 'observe'
     operations: list[Operation] = Field(default_factory=list, max_length=1000)
     limits: Limits = Field(default_factory=Limits)
     cache: CacheRules = Field(default_factory=CacheRules)

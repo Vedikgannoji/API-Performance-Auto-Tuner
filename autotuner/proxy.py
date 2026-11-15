@@ -1,4 +1,4 @@
-"""Observation-only HTTP/1.1 data plane. No response cache or retry policy."""
+"""Bounded HTTP/1.1 data plane with opt-in fixed-TTL caching and no retries."""
 import asyncio
 from http.cookiejar import CookieJar, DefaultCookiePolicy
 import json
@@ -6,10 +6,12 @@ import hashlib
 import hmac
 import secrets
 from time import perf_counter
+from email.utils import formatdate
 
 import httpx
 
 from .core import Metrics
+from .response_cache import ResponseCache, request_reason, representation_key
 
 HOP_HEADERS = {b'connection', b'keep-alive', b'proxy-connection', b'proxy-authenticate',
                b'proxy-authorization', b'te', b'trailer', b'transfer-encoding', b'upgrade'}
@@ -61,7 +63,7 @@ def cache_review_reason(method, headers, response):
 async def json_response(send, status, data):
     body = json.dumps(data).encode()
     await send({'type': 'http.response.start', 'status': status,
-                'headers': [(b'content-type', b'application/json'), (b'cache-control', b'no-store')]})
+                'headers': [(b'content-type', b'application/json'), (b'cache-control', b'no-store'), (b'date',formatdate(usegmt=True).encode())]})
     await send({'type': 'http.response.body', 'body': body})
 
 
@@ -74,6 +76,8 @@ class ObservationProxy:
         self.upstream_metrics = Metrics(capacity=config.metrics.raw_capacity)
         self.slots = asyncio.Semaphore(config.limits.upstream_concurrency)
         self.in_flight = 0
+        self.hot_reads = 0
+        self.cache = ResponseCache(config)
         self.client = httpx.AsyncClient(
             transport=transport, trust_env=False, follow_redirects=False, verify=True,
             cookies=CookieJar(policy=RejectCookies()),
@@ -103,69 +107,81 @@ class ObservationProxy:
         upstream_complete = False
         upstream_start = None
         upstream_elapsed = 0.0
-        admitted = acquired = False
-        response = None
+        admitted = acquired = hot = False
+        response = fill = pinned = None
+        key = rule = None
+        coordination = lock_acquired = False
+        generation = None
+        write_ids = None
         method = scope['method']
         stage = 'request'
         queued = None
         queue_elapsed_ms = 0.0
         review_reason, request_key = 'not_observed', None
+        outcome, reason = 'BYPASS', 'not_evaluated'
+
         async def downstream(message):
             await asyncio.wait_for(send(message), self.config.limits.read_timeout_seconds)
+
+        def diagnostics(headers):
+            headers = [(k,v) for k,v in headers if k.lower() not in (b'x-autotuner-cache',b'x-autotuner-cache-reason')]
+            if not any(k.lower()==b'date' for k,v in headers):
+                headers.append((b'date',formatdate(self.cache.wall_clock(),usegmt=True).encode()))
+            return headers+[(b'x-autotuner-cache',outcome.encode()),(b'x-autotuner-cache-reason',reason.encode())]
+
         async def reject(code, detail):
             nonlocal completed, status, response_started
             status = code
             response_started = True
-            await json_response(downstream, code, {'detail': detail})
+            async def annotated(message):
+                if message['type']=='http.response.start':message=dict(message,headers=diagnostics(message['headers']))
+                await downstream(message)
+            await json_response(annotated, code, {'detail': detail})
             completed = True
+
+        def finish_queue():
+            nonlocal queued, queue_elapsed_ms
+            if queued is not None:
+                elapsed=(perf_counter()-queued)*1000
+                queue_elapsed_ms+=elapsed
+                self.counters['queue_ms']+=elapsed
+                queued=None
+
+        async def hit(entry):
+            nonlocal pinned, response_started, completed, status, outcome, reason
+            pinned=entry
+            outcome,reason='HIT','fresh'
+            status=200
+            age=int(entry.initial_age+max(0,self.cache.clock()-entry.received))
+            headers=list(entry.headers)+[(b'age',str(age).encode()),(b'content-length',str(sum(map(len,entry.chunks))).encode())]
+            response_started=True
+            await downstream({'type':'http.response.start','status':200,'headers':diagnostics(headers)})
+            for chunk in entry.chunks:
+                await downstream({'type':'http.response.body','body':chunk,'more_body':True})
+            await downstream({'type':'http.response.body','body':b'','more_body':False})
+            completed=True
+
         try:
             headers = scope.get('headers', [])
             if sum(len(k) + len(v) + 4 for k, v in headers) > self.config.limits.header_bytes:
                 return await reject(431, 'Request headers exceed configured limit')
             values = {}
-            for key, value in headers:
-                values.setdefault(key.lower(), []).append(value)
+            for name, value in headers:
+                values.setdefault(name.lower(), []).append(value)
             if scope.get('http_version', '1.1') not in ('1.0', '1.1'):
                 return await reject(505, 'Only HTTP/1.x downstream requests are supported')
             if method not in METHODS or b'upgrade' in values or any(b'text/event-stream' in v.lower() for v in values.get(b'accept', [])):
                 return await reject(501, 'Method, upgrade or event-stream traffic is unsupported')
             hops = b','.join(values.get(b'x-autotuner-proxy', [])).split(b',')
-            if self.session_id.encode() in [hop.strip() for hop in hops]:
+            if self.session_id.encode() in [h.strip() for h in hops]:
                 return await reject(508, 'Proxy forwarding loop detected')
-            lengths = values.get(b'content-length', [])
-            transfer = values.get(b'transfer-encoding', [])
+            lengths, transfer = values.get(b'content-length', []), values.get(b'transfer-encoding', [])
             if (len(lengths) > 1 or len(values.get(b'host', [])) > 1 or
                 (lengths and transfer) or (lengths and (not lengths[0].isdigit() or len(lengths[0]) > 20)) or
                 (transfer and transfer != [b'chunked'])):
                 return await reject(400, 'Ambiguous or invalid request framing')
             if lengths and int(lengths[0]) > self.config.limits.request_body_bytes:
                 return await reject(413, 'Request body exceeds configured limit')
-            if self.in_flight >= self.config.limits.upstream_concurrency + self.config.limits.queue_capacity:
-                self.counters['overload_rejections'] += 1
-                return await reject(503, 'Proxy admission capacity exceeded')
-            self.in_flight += 1
-            admitted = True
-            queued = perf_counter()
-            stage = 'queue'
-            await asyncio.wait_for(self.slots.acquire(), self.config.limits.connect_timeout_seconds)
-            acquired = True
-            queue_elapsed_ms = (perf_counter() - queued) * 1000
-            self.counters['queue_ms'] += queue_elapsed_ms
-            stage = 'request'
-            body_deadline = perf_counter() + self.config.limits.read_timeout_seconds
-            body = bytearray()
-            while True:
-                message = await asyncio.wait_for(receive(), max(0, body_deadline - perf_counter()))
-                if message['type'] == 'http.disconnect':
-                    self.counters['cancelled_requests'] += 1
-                    return
-                body.extend(message.get('body', b''))
-                if len(body) > self.config.limits.request_body_bytes:
-                    return await reject(413, 'Request body exceeds configured limit')
-                if not message.get('more_body'):
-                    break
-            if lengths and int(lengths[0]) != len(body):
-                return await reject(400, 'Request length does not match body')
             raw_path = scope.get('raw_path', scope['path'].encode()).split(b'?', 1)[0]
             if not raw_path.startswith(b'/'):
                 return await reject(400, 'An origin-form request path is required')
@@ -173,89 +189,172 @@ class ObservationProxy:
                 target = self.base.copy_with(raw_path=raw_path + (b'?' + scope['query_string'] if scope.get('query_string') else b''))
             except httpx.InvalidURL:
                 return await reject(400, 'Invalid request target')
-            outgoing = filtered_headers(headers, request=True)
-            outgoing = [(k, v) for k, v in outgoing if k != b'x-autotuner-proxy']
-            outgoing.append((b'x-autotuner-proxy', b', '.join([h.strip() for h in hops if h.strip()] + [self.session_id.encode()])))
-            request = httpx.Request(method, target, headers=outgoing, content=bytes(body))
-            # Direct Request construction avoids merging shared client cookies.
-            request.extensions['timeout'] = self.client.timeout.as_dict()
-            upstream_start = perf_counter()
-            stage = 'upstream'
-            self.counters['upstream_requests'] += 1
-            response_deadline = perf_counter() + self.config.limits.response_timeout_seconds
-            response = await asyncio.wait_for(self.client.send(request, stream=True), max(0, response_deadline - perf_counter()))
-            upstream_elapsed += perf_counter() - upstream_start
-            upstream_start = None
-            raw_headers = response.headers.raw
-            if sum(len(k) + len(v) + 4 for k, v in raw_headers) > self.config.limits.header_bytes:
-                return await reject(502, 'Upstream headers exceed configured limit')
-            upstream_lengths = response.headers.get_list('content-length')
-            if len(upstream_lengths) > 1 or (upstream_lengths and 'transfer-encoding' in response.headers):
-                return await reject(502, 'Ambiguous upstream response framing')
-            if response.status_code == 101 or response.headers.get('content-type', '').lower().split(';')[0].strip() == 'text/event-stream':
-                return await reject(502, 'Upstream returned an unsupported upgrade or event stream')
-            review_reason = cache_review_reason(method, headers, response)
-            if body and review_reason == 'review_required':
-                review_reason = 'get_body'
-            if review_reason == 'review_required':
-                fields = [target.raw_path] + [b'\x00'.join(values.get(name, [])) for name in (b'accept', b'accept-encoding')]
-                material = b''.join(len(field).to_bytes(8, 'big') + field for field in fields)
-                request_key = hmac.new(self.reuse_salt, material, hashlib.sha256).hexdigest()
-            status = response.status_code
-            response_started = True
-            await downstream({'type': 'http.response.start', 'status': status,
-                        'headers': filtered_headers(raw_headers)})
-            if method != 'HEAD' and status not in (204, 304):
-                chunks = response.aiter_raw(chunk_size=65536).__aiter__()
+            if self.config.mode=='cache' and any(token.strip().split(b'=',1)[0].lower()==b'only-if-cached'
+                    for value in values.get(b'cache-control',[]) for token in value.split(b',')):
+                reason='only_if_cached_unsupported'
+                return await reject(504,'only-if-cached is unsupported; no upstream request was made')
+            rule=self.cache.rule(scope['path'])
+            reason=request_reason(self.config,rule,method,headers)
+            candidate=reason=='eligible'
+            if candidate and self.cache.writes[rule.id]:
+                candidate,reason=False,'write_in_progress'
+            if candidate:
+                key=representation_key(self.config.upstream,method,target.raw_path,headers)
+                hot=self.cache.contains(key,rule)
+            limit=self.config.limits.upstream_concurrency+self.config.limits.queue_capacity
+            if (self.hot_reads if hot else self.in_flight)>=limit:
+                self.counters['overload_rejections']+=1
+                return await reject(503,'Proxy admission capacity exceeded')
+            if hot:self.hot_reads+=1
+            else:self.in_flight+=1
+            admitted=True
+            # Non-cache requests retain admission-before-body buffering. Cache candidates have zero body framing.
+            if not candidate:
+                stage,queued='queue',perf_counter()
+                await asyncio.wait_for(self.slots.acquire(),self.config.limits.connect_timeout_seconds)
+                acquired=True
+                finish_queue()
+            stage='request'
+            body_deadline=perf_counter()+self.config.limits.read_timeout_seconds
+            body=bytearray()
+            while True:
+                message=await asyncio.wait_for(receive(),max(0,body_deadline-perf_counter()))
+                if message['type']=='http.disconnect':
+                    self.counters['cancelled_requests']+=1
+                    return
+                body.extend(message.get('body',b''))
+                if len(body)>self.config.limits.request_body_bytes:
+                    return await reject(413,'Request body exceeds configured limit')
+                if not message.get('more_body'):break
+            if (lengths and int(lengths[0])!=len(body)) or (candidate and body):
+                return await reject(400,'Request length does not match body')
+            if candidate:
+                pinned=self.cache.acquire(key,rule)
+                if pinned is not None:return await hit(pinned)
+                if hot:
+                    self.hot_reads-=1
+                    hot=False
+                    if self.in_flight>=limit:
+                        admitted=False
+                        self.counters['overload_rejections']+=1
+                        return await reject(503,'Proxy admission capacity exceeded')
+                    self.in_flight+=1
+                coordination=True
+                lock=self.cache.coordination(key)
+                stage,queued='queue',perf_counter()
+                await asyncio.wait_for(lock.acquire(),self.config.limits.connect_timeout_seconds)
+                lock_acquired=True
+                finish_queue()
+                pinned=self.cache.acquire(key,rule)
+                if pinned is not None:return await hit(pinned)
+                generation=self.cache.generations[rule.id]
+                if self.cache.writes[rule.id]:
+                    candidate,reason=False,'write_in_progress'
+                else:
+                    outcome,reason='MISS','origin_fetch'
+                    self.cache.counters['misses']+=1
+                stage,queued='queue',perf_counter()
+                await asyncio.wait_for(self.slots.acquire(),self.config.limits.connect_timeout_seconds)
+                acquired=True
+                finish_queue()
+            outgoing=filtered_headers(headers,request=True)
+            outgoing=[(k,v) for k,v in outgoing if k!=b'x-autotuner-proxy']
+            outgoing.append((b'x-autotuner-proxy',b', '.join([h.strip() for h in hops if h.strip()]+[self.session_id.encode()])))
+            request=httpx.Request(method,target,headers=outgoing,content=bytes(body))
+            request.extensions['timeout']=self.client.timeout.as_dict()
+            if method in ('POST','PUT','PATCH','DELETE'):
+                write_ids=self.cache.begin_write(method,scope['path'])
+            sent=self.cache.clock()
+            upstream_start=perf_counter()
+            stage='upstream'
+            self.counters['upstream_requests']+=1
+            response_deadline=perf_counter()+self.config.limits.response_timeout_seconds
+            response=await asyncio.wait_for(self.client.send(request,stream=True),max(0,response_deadline-perf_counter()))
+            received=self.cache.clock()
+            upstream_elapsed+=perf_counter()-upstream_start
+            upstream_start=None
+            raw_headers=response.headers.raw
+            if sum(len(k)+len(v)+4 for k,v in raw_headers)>self.config.limits.header_bytes:
+                return await reject(502,'Upstream headers exceed configured limit')
+            upstream_lengths=response.headers.get_list('content-length')
+            if (len(upstream_lengths)>1 or (upstream_lengths and ('transfer-encoding' in response.headers or not upstream_lengths[0].isdigit()))):
+                return await reject(502,'Ambiguous upstream response framing')
+            if response.status_code==101 or response.headers.get('content-type','').lower().split(';')[0].strip()=='text/event-stream':
+                return await reject(502,'Upstream returned an unsupported upgrade or event stream')
+            review_reason=cache_review_reason(method,headers,response)
+            if body and review_reason=='review_required':review_reason='get_body'
+            if review_reason=='review_required':
+                fields=[target.raw_path]+[b'\x00'.join(values.get(name,[])) for name in (b'accept',b'accept-encoding')]
+                material=b''.join(len(value).to_bytes(8,'big')+value for value in fields)
+                request_key=hmac.new(self.reuse_salt,material,hashlib.sha256).hexdigest()
+            if candidate:
+                if upstream_lengths and int(upstream_lengths[0])>self.config.limits.cache_entry_bytes:
+                    reason='entry_too_large'
+                elif 'content-range' in response.headers:
+                    reason='partial_response'
+                else:
+                    fill,reason=self.cache.begin_fill(key,rule,generation,raw_headers,response.status_code,received=received,sent=sent)
+                    if fill is not None and upstream_lengths and fill.cost+int(upstream_lengths[0])>self.config.limits.cache_entry_bytes:
+                        self.cache.discard(fill)
+                        fill,reason=None,'entry_too_large'
+                if fill is None:outcome='BYPASS'
+            status=response.status_code
+            response_started=True
+            await downstream({'type':'http.response.start','status':status,'headers':diagnostics(filtered_headers(raw_headers))})
+            delivered=0
+            if method!='HEAD' and status not in (204,304):
+                chunks=response.aiter_raw(chunk_size=65536).__aiter__()
                 while True:
-                    upstream_start = perf_counter()
-                    try:
-                        chunk = await asyncio.wait_for(anext(chunks), max(0, response_deadline - perf_counter()))
-                    except StopAsyncIteration:
-                        break
+                    upstream_start=perf_counter()
+                    try:chunk=await asyncio.wait_for(anext(chunks),max(0,response_deadline-perf_counter()))
+                    except StopAsyncIteration:break
                     finally:
-                        upstream_elapsed += perf_counter() - upstream_start
-                        upstream_start = None
-                    await downstream({'type': 'http.response.body', 'body': chunk, 'more_body': True})
-            upstream_complete = True
-            await downstream({'type': 'http.response.body', 'body': b'', 'more_body': False})
-            completed = True
-        except (httpx.TimeoutException, asyncio.TimeoutError):
-            self.counters['failed_requests'] += 1
-            if response_started:
-                raise IncompleteResponse('Response interrupted after headers') from None
-            if stage == 'queue':
-                self.counters['overload_rejections'] += 1
-                queue_elapsed_ms = (perf_counter() - queued) * 1000
-                self.counters['queue_ms'] += queue_elapsed_ms
-            await reject(408 if stage == 'request' else 503 if stage == 'queue' else 504,
-                         'Request body timed out' if stage == 'request' else
-                         'Proxy admission timed out' if stage == 'queue' else 'Upstream timed out')
-        except (httpx.HTTPError, OSError):
-            self.counters['failed_requests'] += 1
-            if response_started:
-                raise IncompleteResponse('Response interrupted after headers') from None
-            await reject(502, 'Upstream request failed')
+                        upstream_elapsed+=perf_counter()-upstream_start
+                        upstream_start=None
+                    delivered+=len(chunk)
+                    if fill is not None and fill.active and not self.cache.append(fill,chunk):reason='entry_or_buffer_capacity'
+                    await downstream({'type':'http.response.body','body':chunk,'more_body':True})
+                if upstream_lengths and delivered!=int(upstream_lengths[0]):
+                    raise httpx.RemoteProtocolError('Incomplete upstream framing')
+            upstream_complete=True
+            await downstream({'type':'http.response.body','body':b'','more_body':False})
+            completed=True
+            if fill is not None and fill.active:
+                reason='stored' if self.cache.publish(fill) else 'invalidated_or_expired_fill'
+        except (httpx.TimeoutException,asyncio.TimeoutError):
+            self.counters['failed_requests']+=1
+            if response_started:raise IncompleteResponse('Response interrupted after headers') from None
+            if stage=='queue':self.counters['overload_rejections']+=1
+            finish_queue()
+            await reject(408 if stage=='request' else 503 if stage=='queue' else 504,
+                         'Request body timed out' if stage=='request' else 'Proxy admission timed out' if stage=='queue' else 'Upstream timed out')
+        except (httpx.HTTPError,OSError):
+            self.counters['failed_requests']+=1
+            if response_started:raise IncompleteResponse('Response interrupted after headers') from None
+            await reject(502,'Upstream request failed')
         except asyncio.CancelledError:
-            self.counters['cancelled_requests'] += 1
+            self.counters['cancelled_requests']+=1
             raise
         finally:
-            if upstream_start is not None:
-                upstream_elapsed += perf_counter() - upstream_start
-            self.counters['upstream_ms'] += upstream_elapsed * 1000
-            if acquired:
-                self.slots.release()
+            finish_queue()
+            if upstream_start is not None:upstream_elapsed+=perf_counter()-upstream_start
+            self.counters['upstream_ms']+=upstream_elapsed*1000
+            if write_ids is not None:self.cache.end_write(write_ids)
+            self.cache.discard(fill)
+            if pinned is not None:self.cache.release(pinned)
+            if coordination:self.cache.release_coordination(key,lock_acquired)
+            if acquired:self.slots.release()
             if admitted:
-                self.in_flight -= 1
-            if response is not None:
-                await response.aclose()
+                if hot:self.hot_reads-=1
+                else:self.in_flight-=1
+            if response is not None:await response.aclose()
             if upstream_complete:
-                self.upstream_metrics.record(method, self.operation(scope['path'], method), response.status_code,
-                                             upstream_elapsed * 1000, 'BYPASS',
-                                             cache_review_reason=review_reason, request_key=request_key)
-            if response_started and not completed:
-                self.counters['incomplete_responses'] += 1
+                self.upstream_metrics.record(method,self.operation(scope['path'],method),response.status_code,
+                                             upstream_elapsed*1000,'BYPASS',cache_review_reason=review_reason,request_key=request_key)
+            if response_started and not completed:self.counters['incomplete_responses']+=1
             if completed:
-                self.counters['completed_requests'] += 1
-                self.metrics.record(method if method in METHODS else 'OTHER', self.operation(scope['path'], method), status,
-                                    (perf_counter() - start) * 1000, 'BYPASS', queue_ms=queue_elapsed_ms)
+                self.counters['completed_requests']+=1
+                if outcome=='BYPASS':self.cache.counters['bypasses']+=1
+                self.cache.record_decision(rule,outcome,reason,upstream_complete)
+                self.metrics.record(method if method in METHODS else 'OTHER',self.operation(scope['path'],method),status,
+                                    (perf_counter()-start)*1000,outcome,queue_ms=queue_elapsed_ms,cache_reason=reason)

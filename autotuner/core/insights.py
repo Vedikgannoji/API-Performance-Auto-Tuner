@@ -116,7 +116,7 @@ def analyze(config, proxy_metrics, upstream_metrics, *, transport=None, storage=
             suitability.append(dict(operation=operation, state=state, samples=len(cohort), origin_mean_ms=cost,
                                     maximum_same_key_observations=reuse, reuse_window_seconds=min(window,thresholds['reuse_window_seconds']),
                                     screening_reasons=dict(sorted(reasons.items())), rule_id=rule.id if rule else None,
-                                    approved_for_caching=False, response_cache_serving_enabled=False))
+                                    approved_for_caching=False, response_cache_serving_enabled=bool(config.mode=='cache' and rule and rule.policy=='cache')))
             if state in ('explicit_rule_required','policy_review_candidate'):
                 finding('cache_policy_review', operation, 'upstream', dict(samples=len(cohort), mean_ms=cost, same_key_observations=reuse, state=state),
                         dict(minimum_samples=thresholds['cache_minimum_samples'], mean_ms=thresholds['cache_origin_mean_ms'],
@@ -139,7 +139,7 @@ def analyze(config, proxy_metrics, upstream_metrics, *, transport=None, storage=
              else 'collecting_samples' if all(e['successful_origin_samples']<thresholds['minimum_samples'] and e['proxy_samples']<thresholds['minimum_samples'] for e in evaluations)
              else 'no_thresholds_exceeded')
     return dict(schema_version=1, generated_at=datetime.fromtimestamp(now,timezone.utc).isoformat(), window_seconds=window,
-                state=state, effective_mode='observe', recommendations_applied=False, thresholds=thresholds,
+                state=state, effective_mode='cache' if config.mode=='cache' else 'observe', recommendations_applied=False, thresholds=thresholds,
                 evidence_quality=dict(proxy_samples=len(proxy_rows), upstream_samples=len(upstream_rows),
                     raw_evictions=evictions, window_may_be_incomplete=bool(evictions),
                     storage_sampling_incomplete=bool(health.get('sampling_incomplete')), history='live bounded raw observations; reset on restart'),

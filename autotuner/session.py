@@ -1,10 +1,11 @@
-"""Phase 6 advisory observation session and loopback control endpoints."""
+"""Phase 7 proxy session and loopback control endpoints."""
 import uuid
 from urllib.parse import parse_qs
 
 from .proxy import ObservationProxy, json_response
 from .storage import TelemetryStorage, StorageUnavailable
 from .core.insights import analyze
+from .response_cache import effective_mode
 
 
 class ControlSession:
@@ -26,12 +27,12 @@ class ControlSession:
         self.storage.submit(boundary, row)
 
     def status(self):
-        return dict(schema_version=1, session_id=self.session_id, phase=6,
-                    mode=self.config.mode, effective_mode='observe', running=self.running,
+        return dict(schema_version=1, session_id=self.session_id, phase=7,
+                    mode=self.config.mode, effective_mode=effective_mode(self.config), running=self.running,
                     upstream=self.config.upstream, listen=self.config.listen,
-                    forwarding_enabled=True, cache_serving_enabled=False,
+                    forwarding_enabled=True, cache_serving_enabled=effective_mode(self.config)=="cache" and any(r.policy=="cache" for r in self.config.cache.routes),
                     storage=self.storage.health(),
-                    limits=self.config.limits.model_dump(), transport=dict(self.proxy.counters))
+                    limits=self.config.limits.model_dump(), transport=dict(self.proxy.counters),cache=self.proxy.cache.status())
 
     async def __call__(self, scope, receive, send):
         if scope['type'] == 'lifespan':
@@ -52,8 +53,18 @@ class ControlSession:
         elif scope['type'] == 'http':
             path = scope['path']
             if path == '/_autotuner' or path.startswith('/_autotuner/'):
+                if path=='/_autotuner/cache/clear' and scope['method']=='POST':
+                    self.proxy.cache.invalidate()
+                    return await json_response(send,200,dict(schema_version=1,session_id=self.session_id,cleared=True,cache=self.proxy.cache.status()))
                 if scope['method'] != 'GET':
                     return await json_response(send, 405, {'detail': 'GET required'})
+                if path=='/_autotuner/cache/explain':
+                    try:
+                        target=parse_qs(scope.get('query_string',b'').decode()).get('path',['/'])[-1]
+                        if not target.startswith('/') or len(target)>1024 or any(c in target for c in ('?','#','\x00')):raise ValueError()
+                    except (ValueError,UnicodeError):
+                        return await json_response(send,400,{'detail':'Expected a route path without query or fragment'})
+                    return await json_response(send,200,dict(schema_version=1,session_id=self.session_id,**self.proxy.cache.explain(target)))
                 if path in ('/_autotuner/status', '/_autotuner/health'):
                     return await json_response(send, 200, self.status())
                 if path in ('/_autotuner/report', '/_autotuner/sessions'):
@@ -78,7 +89,7 @@ class ControlSession:
                     if path.endswith('/insights'):
                         result = analyze(self.config, self.proxy.metrics, self.proxy.upstream_metrics,
                                          transport=self.proxy.counters, storage=self.storage.health(), window=window)
-                        result.update(session_id=self.session_id, config_digest=self.storage.digest, phase=6)
+                        result.update(session_id=self.session_id, config_digest=self.storage.digest, phase=7)
                         return await json_response(send, 200, result)
                     result = self.proxy.metrics.snapshot(window)
                     result.update(schema_version=1, session_id=self.session_id,
