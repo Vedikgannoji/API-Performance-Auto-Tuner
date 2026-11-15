@@ -1,0 +1,948 @@
+{
+  "phase": 10,
+  "status": "implementation_ready_for_joint_review",
+  "qualification_complete": false,
+  "verified_on": "2026-11-15",
+  "baseline_commit": "79ff6ad",
+  "tests": {
+    "focused_python": 46,
+    "full_python": 465,
+    "javascript": 19,
+    "failed": 0,
+    "focused_command": "python scripts/test_socketless.py tests/test_qualification.py tests/test_reliability.py tests/test_install_contract.py -o addopts=\"\" --tb=short",
+    "full_command": "python scripts/test_socketless.py --junitxml=tmp/phase10-tests.xml --tb=short",
+    "javascript_command": "node --test tests/workflow.test.cjs tests/product_ui.test.cjs",
+    "core_gate_command": "python -m autotuner.quality coverage.json",
+    "compile_check": "python -m compileall -q autotuner scripts/smoke_wheel.py: passed",
+    "diff_check": "git diff --check: passed",
+    "focused_overhead_controller": 93,
+    "focused_overhead_command": "python scripts/test_socketless.py tests/test_overhead_regression.py tests/test_qualification.py tests/test_adaptive_controller.py -o addopts=\"\" --tb=short",
+    "focused_finish": 77,
+    "focused_finish_command": "python scripts/test_socketless.py tests/test_storage.py tests/test_storage_batching.py tests/test_qualification.py tests/test_reliability.py -o addopts=\"\" --tb=short",
+    "focused_storage_recovery": 121,
+    "focused_storage_recovery_command": "python scripts/test_socketless.py tests/test_storage_budget_recovery.py tests/test_storage.py tests/test_qualification.py tests/test_adaptive_controller.py -o addopts=\"\" --tb=short",
+    "focused_page_recovery": 75,
+    "focused_page_recovery_command": "python scripts/test_socketless.py tests/test_storage_budget_recovery.py tests/test_storage.py tests/test_qualification.py -o addopts=\"\" --tb=short"
+  },
+  "coverage": {
+    "covered_lines": 2879,
+    "num_statements": 2911,
+    "percent_covered": 98.07140995569455,
+    "percent_covered_display": "98",
+    "missing_lines": 32,
+    "excluded_lines": 7,
+    "percent_statements_covered": 98.90072140158021,
+    "percent_statements_covered_display": "99",
+    "num_branches": 926,
+    "num_partial_branches": 34,
+    "covered_branches": 884,
+    "missing_branches": 42,
+    "percent_branches_covered": 95.46436285097192,
+    "percent_branches_covered_display": "95"
+  },
+  "core_coverage": {
+    "schema_version": 1,
+    "statements_percent": 100.0,
+    "branches_percent": 100.0,
+    "minimum_percent": 90,
+    "passed": true,
+    "totals": {
+      "num_statements": 469,
+      "covered_lines": 469,
+      "num_branches": 166,
+      "covered_branches": 166
+    }
+  },
+  "new_module_coverage": {
+    "autotuner\\benchmarking.py": {
+      "covered_lines": 288,
+      "num_statements": 290,
+      "percent_covered": 98.87005649717514,
+      "percent_covered_display": "99",
+      "missing_lines": 2,
+      "excluded_lines": 0,
+      "percent_statements_covered": 99.3103448275862,
+      "percent_statements_covered_display": "99",
+      "num_branches": 64,
+      "num_partial_branches": 2,
+      "covered_branches": 62,
+      "missing_branches": 2,
+      "percent_branches_covered": 96.875,
+      "percent_branches_covered_display": "97"
+    },
+    "autotuner\\qualification_fixture.py": {
+      "covered_lines": 62,
+      "num_statements": 62,
+      "percent_covered": 100.0,
+      "percent_covered_display": "100",
+      "missing_lines": 0,
+      "excluded_lines": 0,
+      "percent_statements_covered": 100.0,
+      "percent_statements_covered_display": "100",
+      "num_branches": 18,
+      "num_partial_branches": 0,
+      "covered_branches": 18,
+      "missing_branches": 0,
+      "percent_branches_covered": 100.0,
+      "percent_branches_covered_display": "100"
+    },
+    "autotuner\\qualification_server.py": {
+      "covered_lines": 34,
+      "num_statements": 34,
+      "percent_covered": 97.5,
+      "percent_covered_display": "98",
+      "missing_lines": 0,
+      "excluded_lines": 0,
+      "percent_statements_covered": 100.0,
+      "percent_statements_covered_display": "100",
+      "num_branches": 6,
+      "num_partial_branches": 1,
+      "covered_branches": 5,
+      "missing_branches": 1,
+      "percent_branches_covered": 83.33333333333333,
+      "percent_branches_covered_display": "83"
+    },
+    "autotuner\\quality.py": {
+      "covered_lines": 20,
+      "num_statements": 20,
+      "percent_covered": 95.83333333333333,
+      "percent_covered_display": "96",
+      "missing_lines": 0,
+      "excluded_lines": 0,
+      "percent_statements_covered": 100.0,
+      "percent_statements_covered_display": "100",
+      "num_branches": 4,
+      "num_partial_branches": 1,
+      "covered_branches": 3,
+      "missing_branches": 1,
+      "percent_branches_covered": 75.0,
+      "percent_branches_covered_display": "75"
+    }
+  },
+  "packaging": {
+    "wheel": "api_performance_auto_tuner-2.0.0-py3-none-any.whl",
+    "sha256": "766f2fe357f7b1bb72154bb28fdeabc8eb9b1a315044aa9797c2f149a71094ca",
+    "build": "passed via installed setuptools.build_meta.build_wheel",
+    "target_install": "passed with workspace TEMP/TMP and --no-deps",
+    "packaged_and_installed_files_match_workspace": 34,
+    "installed_smoke_command": "python -I tmp/phase10-package-smoke.py",
+    "installed_smoke": "Passed isolated target imports, CLI init, bundled assets, console/scenario MISS-HIT and phase-10 snapshot, installed mixed benchmark against temporary SQL fixture through ASGI",
+    "dependencies": "Existing environment dependencies; psutil absent locally; fresh-venv dependency resolution not executed",
+    "clean_install": "smoke_wheel.py coordinator unit tests passed; actual clean install pending normal terminal or hosted CI"
+  },
+  "reliability": {
+    "in_process": "Controlled unique-key/admission/cache/storage pressure, expected origin faults, mutation barriers, cancellation storm, resource recovery and persisted shutdown tested",
+    "sql_handles": "Explicitly closed; Windows deletion regression passed",
+    "accounting": "Every successful cache reservation updates a lifetime high-water mark; bounded payload, staging and pinned accounting tested",
+    "timing": "ASGI/polling timings and mocked coordinator measurements are not performance evidence"
+  },
+  "benchmark_attempt": {
+    "command": "python -m autotuner benchmark --profile quick --requests 20 --orders 64 --output tmp/phase10-http-attempt.json --force",
+    "result": "runtime_failure",
+    "exit_code": 1,
+    "reason": "Isolated HTTP server startup failed in managed Windows environment",
+    "artifact_state": "interrupted_or_runtime_failure; qualification_complete false",
+    "median_latency_improvement_percent": null,
+    "observe_overhead_ms": null,
+    "rss_bytes": null
+  },
+  "gates": {
+    "core_statement_coverage": "passed: 100%",
+    "core_branch_coverage": "passed: 100%",
+    "real_http_correctness": "passed in source-matched user revision-2 quick run",
+    "repeated_read_20_percent": "passed pre-storage-fix qualification workload: 84.97% median",
+    "observe_reference_overhead": "latest user run invalid_workload; one observe cohort 69.21 requests/s; reference host unconfirmed",
+    "reference_host": "not_confirmed",
+    "idle_rss_150_mib": "passed user revision-2 quick run",
+    "stability_30_minutes": "pre-fix forwarding/resources passed 1801 s and 106400 requests; persistence failed; new source full-duration verification pending",
+    "cross_platform_ci": "not_run; nine-job OS/Python matrix defined",
+    "public_beta": "not_authorized_by_this_evidence",
+    "telemetry_health": "passed source-matched user 60-second recovery-v2 run; full-duration current-source verification pending"
+  },
+  "ci": {
+    "os": [
+      "ubuntu-latest",
+      "windows-latest",
+      "macos-latest"
+    ],
+    "python": [
+      "3.11",
+      "3.12",
+      "3.13"
+    ],
+    "automatic": "Unit/integration, JavaScript, separate core floors, wheel build, clean-venv install, quick HTTP and short soak",
+    "manual": "Three OS full paired qualification and 1800-second soak; workflow not dispatched"
+  },
+  "review_decisions": [
+    "Built-in owned fixture profiles for qualification; generic declarative correctness remains scenario run, not arbitrary mutating load replay",
+    "Nominal 8-GiB recognition uses 7\u20139 GiB measured RAM, four physical cores, Python 3.12, concurrency eight and explicit attestation",
+    "Late-half 16-MiB RSS and two-task growth diagnostic budgets require review alongside checkpoint history",
+    "Quick mode fails correctness/accounting/shutdown issues but reports non-reference performance misses without claiming qualification"
+  ],
+  "limitations": [
+    "Managed Windows socketless polling loop required for in-process tests",
+    "Standard asyncio probe stalled and was interrupted; real benchmark child startup produced no HTTP evidence",
+    "No real latency, RSS, full sustained stability, clean dependency install or hosted CI result claimed",
+    "Source-matched user/reference-host reports remain required before Phase 11 release qualification"
+  ],
+  "source_sha256": {
+    ".github/workflows/backend.yml": "bebd94336d1126ca530f640bcc2d33a6402f5008975ef05e4647c9b65d6aa2c9",
+    ".github/workflows/qualification.yml": "996378e43dc7054941a88414a25fe9ef3c6831132cf423964c9884add3393ca5",
+    "autotuner/__init__.py": "3fabac76430f0af6f9a9822c1e131b9a2ee992851de26db345019af804653e3a",
+    "autotuner/__main__.py": "0dd072ac4488f65bf8c5864ce7a52efa1498fe3fe980353e07f148507de7c735",
+    "autotuner/benchmarking.py": "034cbe561f662c1f0720cdbcc7d9b9a627aa302011fa8d90adc8a22f5e8a0fcf",
+    "autotuner/cache.py": "258666f564d89e514465bad746b90bb80781930306eac1934a185322502a8449",
+    "autotuner/cli.py": "fd4e91804b59a3226b2b0f8ba108f1973296e53a45c43f7f49d50b47e8df8f9a",
+    "autotuner/console.py": "15187637fc3ad8483652511688d845126a8659b9064f45e4ff306699a2ef62f5",
+    "autotuner/core/__init__.py": "3cdcabf194fdc872bbe873acf07d95e33e7a8a1422964b73137e06d30b40ec49",
+    "autotuner/core/cache.py": "c800383026e72c8813d59e69f97b4a253b6dd9ae74f8ce4e013d6178c4cdf70e",
+    "autotuner/core/contracts.py": "895a19767dcac0c76887a6360e01a1a83c47e4f0faf1f92f9f03716c123b6713",
+    "autotuner/core/controller.py": "2707eff37da818d2f732d43c6d6b54638bbf7911db5b3e5b039c597668cf4db0",
+    "autotuner/core/engine.py": "f309d391663fdbe8d941117c42501d02c445ae81d865d3fe02952d4ada03c2c2",
+    "autotuner/core/insights.py": "80670b5ebfda3a43d8277af3bb942d160a660c32dff27d6c268b619331737585",
+    "autotuner/core/metrics.py": "559e10821dce47fac2fd070acace9bd818de33c800e5f25b69cf85fed2e74eed",
+    "autotuner/core/monitoring.py": "1abee374d2ca3f40206b292fa9271e95c63f527550d6527b3106bcfaca413b0d",
+    "autotuner/dashboard.html": "fb57e52468201182adc287c8b5261b989145c169a154daf0e6e0165383fb9c4e",
+    "autotuner/database.py": "99fea81ca0757a0f289533e6e98657bf818f971b2efcaf492c0d057bc7a042f4",
+    "autotuner/main.py": "169beaee737b8957b69e0b2e21cfe121f3a9707902ff79a9b0ff55616ef2c6b8",
+    "autotuner/metrics.py": "85df644ef01ce70ce7dcfcd60e51a483670787dbbd45e944179178c597f30e8f",
+    "autotuner/product.css": "66a025eb43f5f9dd64ee169260105a591c821d189b0fbf4a6db7b0ca0aa3a9e5",
+    "autotuner/product_config.py": "da38b6766a2d99b5e55b27e9a1866b2f7a25253c4841abfe6911a9279e15f0ff",
+    "autotuner/product_dashboard.html": "7b8cfd47186e011ddb87004e186dd4d7bda3f233efc5a0399d4bd60286eada15",
+    "autotuner/product_ui.js": "fa9d3ddc8e74116ac3438c77667a02a0e52f516eb163d6f0a86db39db8de6119",
+    "autotuner/proxy.py": "e0efb66cb63b29b7e0557e9c4d1b9f8cc0afe40d6e0a8b37be0ba40e331f0b93",
+    "autotuner/qualification_fixture.py": "21255bdee40396aa8d7d50b592f13b34e9481a5e04bcfb0701a220282dec603e",
+    "autotuner/qualification_server.py": "4fc400fabe1dd5946db5f9d4524ae1bbb7da63b630ee43d890ababdbf2613cba",
+    "autotuner/quality.py": "3f5decf6e8ce5b600e17480ac3b5d57f4c7ca6c8679f25dc12a4af199db5322a",
+    "autotuner/reporting.py": "e21bec89da24c5a6468711e7cd5f240655f4be60e2ed02aca5a940860612ae78",
+    "autotuner/response_cache.py": "8587459fd9a064fcd5041447bfb07d00680224d53faa2e31ca043807f1fad767",
+    "autotuner/scenario_presets.json": "2aa945e0fc1cda5ddec9244826fd15bf46afea225ff642c19a46e0dbf8762e93",
+    "autotuner/scenarios.py": "c86d1a202128c39d1caaa654cdd5502557b34d447de68743073554b5e3e003af",
+    "autotuner/schemas.py": "0306b6c444cabb1e5379abb01aff603c144d188a19d9efdbc698cb8322fe8e29",
+    "autotuner/session.py": "8b4256d10973962fe91ecb1c895d751a84558e1b1ac967785656cecc2a334f48",
+    "autotuner/storage.py": "74cbf068ee4a2c89fa879ee6ece3b40dce18877531f3d6d129d6ea14b7ab647c",
+    "autotuner/workflow.js": "0ca385617f52c7124250b5b7a794e2eef0b84750941cd0715b52ba23676f61cd",
+    "docs/product/PHASE_10_RELIABILITY_EVIDENCE.md": "2e58b329689f2d837eb970d8b4ac101f0c5bc59f015ba7f8926e0387b4285827",
+    "pyproject.toml": "a421369ee8c411479f83fc5e145b6fc747a771fed5055a279d22b04a570be3f0",
+    "README.md": "f5d0d93c7ed4e3660dacabaf62754f97f68cd69afbd04658fba62e6f78a28f39",
+    "scripts/smoke_wheel.py": "b91a9e937244ca55edb6a7869f46f0df4ed1cf1f27ac2d59086ca043fad52a71",
+    "tests/test_console.py": "dc0ee907881ed0f212dac021f6e11c880787556432a35cc7b43af8d0f5b4a88f",
+    "tests/test_insights.py": "91fff959621ef58babe6c1cb04102dfd87f348c05e15885e5a680b685c5b6005",
+    "tests/test_install_contract.py": "5a1e1789c9c75c456e3c20b9f4e0beba5795f08ad75f35d7adc82cf319797d00",
+    "tests/test_overhead_regression.py": "21d475aef54b42f0c99e194035b42c92e90d8f892701ed2ad710c3ac84851806",
+    "tests/test_qualification.py": "fc26555c5521aedbfeaee30c971cb0bd4277bfde0fb9a11b2b3a3d6316bd2179",
+    "tests/test_reliability.py": "7065059c5f5ed7f4f06d3792fef0817b08b3aa495a34adfd12a515a12d4b676b",
+    "tests/test_response_cache.py": "6ef622b4e5d4c3f4cac010d682befb96debb5a2f34f2a3f55f77dbf2f24e06e4",
+    "tests/test_storage.py": "dea1ea97f43f343a55df76a3f4bfa8364cc2ac0cbfc2fa97470fd4eabd8e65a5",
+    "tests/test_storage_batching.py": "7679fe27721ff41d491344074e73ba32f0b8360cd6a7749a0c483b530337db8b",
+    "tests/test_storage_budget_recovery.py": "cd4bdd932ac01fb9aef81726596704c9af0f86fc6581a8ae611ffd5826e83950"
+  },
+  "overhead_followup": {
+    "status": "revision_2_ready_for_user_http_rerun",
+    "measurement_revision": 2,
+    "user_before_report_sha256": "942de0cfa895216493d98fb03ee299213de78cefef7c1d7a601460a3e74fa991",
+    "user_before_source_digest": "a293c71023839f4efa2dbd8a74607553122ddeebdaed9afed513d9f7d7f15709",
+    "user_before_options": {
+      "profile": "quick",
+      "requests": 40,
+      "concurrency": 8,
+      "repeats": 3,
+      "orders": 2000,
+      "rate": 100,
+      "duration_seconds": 60,
+      "reference_host": false
+    },
+    "user_before_gates": {
+      "correctness": {
+        "state": "passed"
+      },
+      "shutdown": {
+        "state": "passed"
+      },
+      "repeated_read_benefit": {
+        "state": "passed",
+        "values": [
+          36.75130941563872,
+          39.549102739016575,
+          34.980748944080844
+        ]
+      },
+      "observe_median_overhead": {
+        "state": "failed",
+        "values": [
+          20.827699976507574,
+          15.5998999834992,
+          13.682999997399747
+        ]
+      },
+      "observe_p95_overhead": {
+        "state": "failed",
+        "values": [
+          37.47169999405742,
+          39.230199996382,
+          26.81089998804964
+        ]
+      },
+      "offered_rate": {
+        "state": "failed",
+        "values": [
+          93.95489507857378,
+          71.00158564284503,
+          94.76472288201181,
+          77.52686208826616,
+          94.62658221845261,
+          78.54532487543756
+        ]
+      },
+      "reference_environment": {
+        "state": "not_confirmed"
+      },
+      "idle_memory": {
+        "state": "passed",
+        "values": [
+          52031488,
+          51716096,
+          52076544,
+          51912704,
+          51806208,
+          52068352,
+          52318208,
+          52019200,
+          51871744,
+          51879936,
+          51781632,
+          51982336,
+          51740672,
+          52178944,
+          51896320,
+          52080640,
+          51937280,
+          52146176,
+          51986432,
+          51945472,
+          52224000,
+          52133888,
+          52056064,
+          51732480,
+          52060160,
+          51830784,
+          52174848,
+          52129792,
+          51834880,
+          52039680,
+          51998720,
+          51781632,
+          52183040,
+          52056064,
+          51945472,
+          52228096
+        ]
+      },
+      "cache_budget": {
+        "state": "passed"
+      },
+      "stability_30_minutes": {
+        "state": "not_measured"
+      },
+      "compatibility_matrix": {
+        "state": "pending_hosted_ci"
+      }
+    },
+    "interpretation": "Response checks and accounting passed. Initialization consumed about 330 ms of the pacing schedule and triggered catch-up bursts; this is not steady-100-RPS qualification evidence.",
+    "fixes": [
+      "Start workload/pacing clock after HTTPX client initialization; record setup separately",
+      "Stop elapsed workload at final response; record client close separately",
+      "Recheck absolute deadlines after early timer wakeups; no OS timer/policy changes",
+      "Construct unchanged controller audit records only when decision signature changes",
+      "Expose clock implementation/resolution and measurement revision in reports"
+    ],
+    "controlled_regressions": "Injected 8 s setup and 7 s close: unchanged 20-request 100/s schedule, 191 ms measured window, 1 ms response latencies, zero setup-induced lag; early wake and cancellation checks passed",
+    "structural_probe": {
+      "transport": "ASGI/mock; no HTTP performance claim",
+      "requests": 20,
+      "controller_evaluations": 120,
+      "pydantic_model_dump_calls_before": 240,
+      "pydantic_model_dump_calls_after": 141
+    },
+    "real_http_performance_after": "not_verified",
+    "rerun_command": "autotuner benchmark --profile quick --output tmp/phase10-quick-after.json"
+  },
+  "user_revision2_quick": {
+    "measurement_revision": 2,
+    "artifact_sha256": "8cdbbc1c45d56d99c61dda6373e18ad940253b9d4d4ddd66f1a568a879a6a05a",
+    "source_digest": "639dc23046533fd7c5175b36667c8ecbfce632fd1a2b18167bd4cb6a451b9ded",
+    "workspace_source_mismatches": [],
+    "options": {
+      "profile": "quick",
+      "requests": 40,
+      "concurrency": 8,
+      "repeats": 3,
+      "orders": 2000,
+      "rate": 100,
+      "duration_seconds": 60,
+      "reference_host": false
+    },
+    "gates": {
+      "correctness": {
+        "state": "passed"
+      },
+      "shutdown": {
+        "state": "passed"
+      },
+      "repeated_read_benefit": {
+        "state": "passed",
+        "values": [
+          22.144825724215146,
+          47.36619139414887,
+          48.63050103720554
+        ]
+      },
+      "observe_median_overhead": {
+        "state": "passed",
+        "values": [
+          3.376699984073639,
+          2.5519000191707164,
+          2.393700007814914
+        ]
+      },
+      "observe_p95_overhead": {
+        "state": "failed",
+        "values": [
+          9.977300011087209,
+          10.318899992853403,
+          2.4776000063866377
+        ]
+      },
+      "offered_rate": {
+        "state": "passed",
+        "values": [
+          100.03608801841418,
+          99.72993134446949,
+          98.47482195990273,
+          100.18318495776009,
+          101.21091266399242,
+          99.95294714965436
+        ]
+      },
+      "reference_environment": {
+        "state": "not_confirmed"
+      },
+      "idle_memory": {
+        "state": "passed",
+        "values": [
+          52056064,
+          51814400,
+          51884032,
+          52035584,
+          51847168,
+          52064256,
+          51937280,
+          51634176,
+          51916800,
+          52236288,
+          52142080,
+          51924992,
+          51990528,
+          51855360,
+          52002816,
+          51908608,
+          51953664,
+          51752960,
+          51888128,
+          51871744,
+          52133888,
+          52101120,
+          51843072,
+          52117504,
+          51785728,
+          51818496,
+          51802112,
+          51838976,
+          51843072,
+          51998720,
+          51781632,
+          51920896,
+          51945472,
+          52150272,
+          52281344,
+          51912704
+        ]
+      },
+      "cache_budget": {
+        "state": "passed"
+      },
+      "stability_30_minutes": {
+        "state": "not_measured"
+      },
+      "compatibility_matrix": {
+        "state": "pending_hosted_ci"
+      }
+    },
+    "median_repeated_read_improvement_percent": 47.36619139414887,
+    "median_added_p50_ms": 2.5519000191707164,
+    "median_added_p95_ms": 9.977300011087209,
+    "review": "Correctness/accounting/shutdown/memory, offered rate and median overhead passed. Tail overhead failed; full qualification, reference host, soak and CI remain pending."
+  },
+  "user_revision2_qualification": {
+    "artifact_sha256": "d78587251e3ea640054ba8a388764421bb85e4481a15e0e503e98a26bae132d8",
+    "source_digest": "639dc23046533fd7c5175b36667c8ecbfce632fd1a2b18167bd4cb6a451b9ded",
+    "workspace_source_matches": true,
+    "options": {
+      "profile": "qualification",
+      "requests": 120,
+      "concurrency": 8,
+      "repeats": 3,
+      "orders": 50000,
+      "rate": 100,
+      "duration_seconds": 60,
+      "reference_host": false
+    },
+    "gates": {
+      "correctness": {
+        "state": "passed"
+      },
+      "shutdown": {
+        "state": "passed"
+      },
+      "repeated_read_benefit": {
+        "state": "passed",
+        "values": [
+          74.5216491660299,
+          90.96124431498991,
+          73.98557613783801
+        ]
+      },
+      "observe_median_overhead": {
+        "state": "failed",
+        "values": [
+          2.848700009053573,
+          3.7299999967217445,
+          3.9843000122345984
+        ]
+      },
+      "observe_p95_overhead": {
+        "state": "passed",
+        "values": [
+          6.540500005939975,
+          8.715699979802594,
+          -241.25410002307035
+        ]
+      },
+      "offered_rate": {
+        "state": "failed",
+        "values": [
+          100.58443749159157,
+          100.23480001672377,
+          100.18974267235032,
+          99.87506461675756,
+          71.88361611208353,
+          99.22814559911771
+        ]
+      },
+      "reference_environment": {
+        "state": "not_confirmed"
+      },
+      "idle_memory": {
+        "state": "passed",
+        "values": [
+          52068352,
+          51908608,
+          51703808,
+          51646464,
+          51884032,
+          51810304,
+          51978240,
+          51986432,
+          51830784,
+          51830784,
+          51941376,
+          51855360,
+          52076544,
+          51863552,
+          51818496,
+          51822592,
+          51843072,
+          51978240,
+          52105216,
+          52174848,
+          51847168,
+          51884032,
+          51830784,
+          51838976,
+          51949568,
+          52097024,
+          52117504,
+          52043776,
+          52047872,
+          51687424,
+          51990528,
+          51691520,
+          51838976,
+          51888128,
+          51904512,
+          51777536
+        ]
+      },
+      "cache_budget": {
+        "state": "passed"
+      },
+      "stability_30_minutes": {
+        "state": "not_measured"
+      },
+      "compatibility_matrix": {
+        "state": "pending_hosted_ci"
+      }
+    },
+    "median_repeated_read_improvement_percent": 74.5216491660299,
+    "median_added_p50_ms": 3.7299999967217445,
+    "median_added_p95_ms": 6.540500005939975,
+    "review": "Not qualified: median overhead and achieved-rate gates failed; third direct overhead cohort had a large baseline tail outlier. Reference host, soak and hosted CI pending."
+  },
+  "final_implementation_followup": {
+    "status": "implemented_and_locally_tested; external qualification pending",
+    "telemetry_batch_window_ms": 20,
+    "telemetry_batch_limit": 64,
+    "durability": "SQLite FULL retained; FIFO decision/export/close barriers and ordinary drain preserved",
+    "batch_regressions": "Count/time bounds, empty queue remaining timeout, FIFO export barrier, accepted-event flush and shutdown passed",
+    "overhead_gate": "invalid_workload when any direct/observe overhead cohort misses the required rate; raw values and threshold outcome retained; no discarded pairs",
+    "post_change_real_http": "not_run_in_managed_sandbox",
+    "next_commands": [
+      "autotuner benchmark --profile qualification --output tmp/phase10-final.json",
+      "autotuner benchmark --profile soak --duration-seconds 1800 --output tmp/phase10-soak-final.json"
+    ]
+  },
+  "user_final_reports_before_storage_recovery": {
+    "source_matched_at_review": true,
+    "qualification_artifact_sha256": "3687b9ddddc2e4e8df7e93ff0496022ba3b69a34373b6b047039e5fb309eccb0",
+    "soak_artifact_sha256": "28f2c8d46189f8e5702338fd0f55a5cf52d0f79b96fc09bf90d4a2456f381405",
+    "source_digest": "5c91881a81e0ed343d7c0e117e1c6a8a00557243206db873e3ba76841bc25b65",
+    "qualification_gates": {
+      "correctness": {
+        "state": "passed"
+      },
+      "shutdown": {
+        "state": "passed"
+      },
+      "repeated_read_benefit": {
+        "state": "passed",
+        "values": [
+          84.9747620209312,
+          85.1830175095032,
+          70.47565128692146
+        ]
+      },
+      "observe_median_overhead": {
+        "state": "invalid_workload",
+        "values": [
+          1.4146000030450523,
+          3.5113999620079994,
+          25.021999957971275
+        ],
+        "threshold_passed": false,
+        "reason": "Paired overhead cohorts must all achieve 95\u2013105 requests/s at configured 100/s; no cohorts were discarded"
+      },
+      "observe_p95_overhead": {
+        "state": "invalid_workload",
+        "values": [
+          2.1791000035591424,
+          15.677499992307276,
+          187.54970002919436
+        ],
+        "threshold_passed": false,
+        "reason": "Paired overhead cohorts must all achieve 95\u2013105 requests/s at configured 100/s; no cohorts were discarded"
+      },
+      "offered_rate": {
+        "state": "failed",
+        "values": [
+          100.35754885757028,
+          100.40577319419825,
+          100.42015794376405,
+          100.39124139752577,
+          100.34633701807923,
+          69.21308129617837
+        ]
+      },
+      "reference_environment": {
+        "state": "not_confirmed"
+      },
+      "idle_memory": {
+        "state": "passed",
+        "values": [
+          52031488,
+          51912704,
+          52015104,
+          52027392,
+          51912704,
+          51617792,
+          51789824,
+          52072448,
+          51646464,
+          52043776,
+          51875840,
+          51843072,
+          51998720,
+          51806208,
+          51884032,
+          51982336,
+          51998720,
+          51855360,
+          51949568,
+          51638272,
+          52256768,
+          51970048,
+          51916800,
+          51855360,
+          52019200,
+          52150272,
+          51822592,
+          52297728,
+          51814400,
+          52068352,
+          51679232,
+          51830784,
+          51728384,
+          51924992,
+          52035584,
+          51900416
+        ]
+      },
+      "cache_budget": {
+        "state": "passed"
+      },
+      "stability_30_minutes": {
+        "state": "not_measured"
+      },
+      "compatibility_matrix": {
+        "state": "pending_hosted_ci"
+      }
+    },
+    "median_repeated_read_improvement_percent": 84.9747620209312,
+    "soak_summary": {
+      "elapsed_seconds": 1801.0271481000236,
+      "requests": 106400,
+      "unexpected_failures": 0,
+      "http_errors": 4256,
+      "checkpoint_count": 1064,
+      "checkpoints_truncated": false,
+      "persisted_sampling": {
+        "persistent": false,
+        "state": "degraded",
+        "last_error": "storage_write_or_read_failed",
+        "writer_batch_window_ms": 20.0,
+        "writer_batch_limit": 64,
+        "queue_depth": 0,
+        "queue_capacity": 32,
+        "disk_bytes": 49152,
+        "disk_budget_bytes": 131072,
+        "tuning_history_may_be_incomplete": true,
+        "transport": {
+          "upstream_requests": 59587,
+          "completed_requests": 106400,
+          "failed_requests": 0,
+          "incomplete_responses": 0,
+          "cancelled_requests": 0,
+          "overload_rejections": 0,
+          "queue_ms": 649990.6510105357,
+          "upstream_ms": 3210785.0777097046
+        },
+        "enqueued_observations": 42976,
+        "persisted_observations": 42966,
+        "dropped_queue": 123011,
+        "dropped_storage": 10,
+        "retention_truncated": 0,
+        "budget_truncated": 42931,
+        "sessions_truncated": 0,
+        "write_errors": 18492,
+        "persisted_tuning_decisions": 24,
+        "dropped_tuning_decisions": 56392,
+        "tuning_decisions_truncated": 0,
+        "write_batches": 15328,
+        "largest_batch_observations": 14,
+        "sampling_incomplete": true,
+        "checkpoint_at_utc": "2026-11-15T12:41:44.474641+00:00",
+        "sampling_may_be_incomplete": true,
+        "durability_boundary": "last committed writer checkpoint; pending or abrupt-exit observations may be absent"
+      }
+    },
+    "soak_gates": {
+      "stability_30_minutes": {
+        "state": "passed",
+        "late_half_rss_growth_bytes": 3174400,
+        "late_half_task_growth": 0,
+        "observed_hits_misses_mutations_and_faults": true,
+        "monitoring_reconciled": true,
+        "diagnostic_growth_budget_bytes": 16777216,
+        "diagnostic_task_growth_budget": 2,
+        "note": "Diagnostic growth bounds supplement, not replace, review of full checkpoints."
+      }
+    },
+    "interpretation": "Forwarding/resource stability passed, but persistence was degraded with 18492 write errors; no overall qualification pass. Recovery code and telemetry-health gate were added afterward."
+  },
+  "storage_budget_followup": {
+    "implemented": true,
+    "regression": "Minimum 128-KiB SQLite budget: full audit table reclaimed, 30 decisions and 80 metric observations persisted, writer ready with zero write errors; truncated audit history explicitly incomplete",
+    "previous_session_attribution": "passed",
+    "new_gate": "telemetry_health: failed for degraded/nonpersistent writers or recorded write errors, independent of forwarding stability",
+    "external_recovery_run": "pending",
+    "next_command": "autotuner benchmark --profile soak --duration-seconds 60 --output tmp/phase10-storage-recovery.json"
+  },
+  "user_60_second_recovery_before_page_fix": {
+    "artifact_sha256": "193872f96221c2f1e1bdcc2d1f988aa18d11cc23fba2143d067eb090ec06ee66",
+    "source_digest": "5395c632da001590cc71e6d5fd463d73b7166874c018abddd582a712f5702257",
+    "source_matched_at_review": true,
+    "gates": {
+      "telemetry_health": {
+        "state": "failed",
+        "storage_state": "ready",
+        "write_errors": 31,
+        "note": "Retention/queue truncation remains disclosed; unrecovered writer faults cannot qualify persistence."
+      },
+      "stability_30_minutes": {
+        "state": "not_qualified",
+        "late_half_rss_growth_bytes": 3289088,
+        "late_half_task_growth": 0,
+        "observed_hits_misses_mutations_and_faults": true,
+        "monitoring_reconciled": true,
+        "diagnostic_growth_budget_bytes": 16777216,
+        "diagnostic_task_growth_budget": 2,
+        "note": "Diagnostic growth bounds supplement, not replace, review of full checkpoints."
+      }
+    },
+    "summary": {
+      "elapsed_seconds": 65.13832169998204,
+      "requests": 3100,
+      "unexpected_failures": 0,
+      "http_errors": 124,
+      "checkpoint_count": 31,
+      "checkpoints_truncated": false,
+      "persisted_sampling": {
+        "persistent": true,
+        "state": "ready",
+        "last_error": null,
+        "writer_batch_window_ms": 20.0,
+        "writer_batch_limit": 64,
+        "queue_depth": 0,
+        "queue_capacity": 32,
+        "disk_bytes": 45056,
+        "disk_budget_bytes": 131072,
+        "tuning_history_may_be_incomplete": true,
+        "transport": {
+          "upstream_requests": 1739,
+          "completed_requests": 3100,
+          "failed_requests": 0,
+          "incomplete_responses": 0,
+          "cancelled_requests": 0,
+          "overload_rejections": 0,
+          "queue_ms": 25312.041098775808,
+          "upstream_ms": 125642.35690084752
+        },
+        "enqueued_observations": 2261,
+        "persisted_observations": 2147,
+        "dropped_queue": 2578,
+        "dropped_storage": 114,
+        "retention_truncated": 0,
+        "budget_truncated": 2093,
+        "sessions_truncated": 0,
+        "write_errors": 31,
+        "persisted_tuning_decisions": 869,
+        "dropped_tuning_decisions": 778,
+        "tuning_decisions_truncated": 865,
+        "write_batches": 749,
+        "largest_batch_observations": 10,
+        "sampling_incomplete": true,
+        "checkpoint_at_utc": "2026-11-15T13:31:34.480834+00:00",
+        "sampling_may_be_incomplete": true,
+        "durability_boundary": "last committed writer checkpoint; pending or abrupt-exit observations may be absent"
+      }
+    },
+    "interpretation": "Writer recovered to ready but recorded 31 errors; recovery gate correctly failed. Page-level reclamation fix followed."
+  },
+  "storage_page_recovery_followup": {
+    "root_cause": "Single small-row evictions did not reliably release a SQLite page before the bounded retries expired",
+    "fix": "Reclaim up to eight oldest audit rows per attempt, attribute every truncation to its session, keep disk budget and retry bounds unchanged",
+    "synchronous_reproducer": {
+      "audit_writes": 250,
+      "metric_writes": 500,
+      "write_errors": 0
+    },
+    "threaded_reproducer": {
+      "audit_writes": 500,
+      "metric_writes": 1000,
+      "write_errors_before": 12,
+      "write_errors_after": 0,
+      "dropped_storage_before": 24,
+      "dropped_storage_after": 0,
+      "budget_truncated_after": 936,
+      "scope": "Owned temporary 128-KiB SQLite; structural correctness, not real-HTTP evidence"
+    },
+    "external_followup": "pending",
+    "command": "autotuner benchmark --profile soak --duration-seconds 60 --output tmp/phase10-storage-recovery-v2.json"
+  },
+  "user_storage_recovery_v2": {
+    "artifact_sha256": "bbbdacd9847425542c5044a5785de0164eb2dbe90747e9ea8bb016c7b74ca5a3",
+    "source_digest": "045c07791997811dffe25e54e733f503804817b51fa0375ce6a637836707d45b",
+    "source_matched_at_review": true,
+    "elapsed_seconds": 63.34505330002867,
+    "requests": 2100,
+    "unexpected_failures": 0,
+    "gates": {
+      "telemetry_health": {
+        "state": "passed",
+        "storage_state": "ready",
+        "write_errors": 0,
+        "note": "Retention/queue truncation remains disclosed; unrecovered writer faults cannot qualify persistence."
+      },
+      "stability_30_minutes": {
+        "state": "not_qualified",
+        "late_half_rss_growth_bytes": 2375680,
+        "late_half_task_growth": 0,
+        "observed_hits_misses_mutations_and_faults": true,
+        "monitoring_reconciled": true,
+        "diagnostic_growth_budget_bytes": 16777216,
+        "diagnostic_task_growth_budget": 2,
+        "note": "Diagnostic growth bounds supplement, not replace, review of full checkpoints."
+      }
+    },
+    "sampling": {
+      "persistent": true,
+      "state": "ready",
+      "last_error": null,
+      "writer_batch_window_ms": 20.0,
+      "writer_batch_limit": 64,
+      "queue_depth": 0,
+      "queue_capacity": 32,
+      "disk_bytes": 28672,
+      "disk_budget_bytes": 131072,
+      "tuning_history_may_be_incomplete": true,
+      "transport": {
+        "upstream_requests": 1179,
+        "completed_requests": 2100,
+        "failed_requests": 0,
+        "incomplete_responses": 0,
+        "cancelled_requests": 0,
+        "overload_rejections": 0,
+        "queue_ms": 29110.142501129303,
+        "upstream_ms": 140899.1522998549
+      },
+      "enqueued_observations": 1937,
+      "persisted_observations": 1937,
+      "dropped_queue": 1342,
+      "dropped_storage": 0,
+      "retention_truncated": 0,
+      "budget_truncated": 1931,
+      "sessions_truncated": 0,
+      "write_errors": 0,
+      "persisted_tuning_decisions": 756,
+      "dropped_tuning_decisions": 361,
+      "tuning_decisions_truncated": 753,
+      "write_batches": 685,
+      "largest_batch_observations": 11,
+      "sampling_incomplete": true,
+      "checkpoint_at_utc": "2026-11-15T13:44:31.910526+00:00",
+      "sampling_may_be_incomplete": true,
+      "durability_boundary": "last committed writer checkpoint; pending or abrupt-exit observations may be absent"
+    },
+    "graceful_shutdown": true,
+    "review": "Targeted storage recovery passed, with zero write errors and all accepted observations persisted; deliberate pressure drops/truncation disclosed. Full-duration current-source verification and performance/reference-host/CI gates remain pending."
+  }
+}

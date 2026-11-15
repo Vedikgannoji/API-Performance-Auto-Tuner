@@ -133,6 +133,7 @@ class ResponseCache:
         self.decisions={}
         self.controller=AdaptiveController(config,clock=lambda:self.clock(),wall_clock=lambda:self.wall_clock(),session_id=session_id,on_change=self._tuning_changed)
         self.used_bytes=0
+        self.peak_bytes=0
         self.retired=0
         self.counters=dict(hits=0,misses=0,bypasses=0,stores=0,evictions=0,expirations=0,
                            invalidations=0,coalesced_waiters=0,generation_rejections=0)
@@ -214,6 +215,7 @@ class ResponseCache:
             self._remove(next(iter(self.entries)),'evictions')
         if self.used_bytes+cost>self.config.limits.cache_bytes:return False
         self.used_bytes+=cost
+        self.peak_bytes=max(self.peak_bytes,self.used_bytes)
         return True
 
     def begin_fill(self,key,rule,generation,headers,status,*,received,sent):
@@ -288,5 +290,6 @@ class ResponseCache:
 
     def status(self):
         return dict(mode=effective_mode(self.config),rules_enabled=sum(self.serving(r) for r in self.config.cache.routes),entries=len(self.entries),accounted_bytes=self.used_bytes,
+                    peak_accounted_bytes=self.peak_bytes,
                     byte_budget=self.config.limits.cache_bytes,retired_pinned_entries=self.retired,
                     coordination_keys=len(self.locks),active_writes=sum(self.writes.values()),**self.counters)

@@ -72,15 +72,16 @@ class AdaptiveController:
         inputs=dict(samples=len(samples),successful_samples=len(successes),failed_samples=len(errors),origin_mean_ms=mean,
                     maximum_same_key_observations=maximum_reuse,cache_hits=state['hits'],origin_observations=state['origin_observations'],
                     invalidation_boundaries=state['invalidations'])
-        decision=dict(schema_version=1,session_id=self.session_id,rule_id=rule.id,
-            timestamp=datetime.fromtimestamp(self.wall_clock(),timezone.utc).isoformat(),action=action,reason=reason,
-            applied=changed and applies,previous_enabled=old_enabled,new_enabled=state['enabled'],
-            previous_ttl_seconds=old_ttl,new_ttl_seconds=state['ttl'],candidate_enabled=candidate,candidate_ttl_seconds=desired_ttl,
-            thresholds=options.model_dump(),inputs=inputs)
         signature=(state['enabled'],state['ttl'],candidate,desired_ttl,reason,action=='cooldown',len(samples),len(errors),
                    state['origin_observations'],state['invalidations'],maximum_reuse>=options.reuse_minimum)
         if signature!=state['signature']:
             state['signature']=signature
+            # Only materialize an audit record when an actual observation/decision changed.
+            decision=dict(schema_version=1,session_id=self.session_id,rule_id=rule.id,
+                timestamp=datetime.fromtimestamp(self.wall_clock(),timezone.utc).isoformat(),action=action,reason=reason,
+                applied=changed and applies,previous_enabled=old_enabled,new_enabled=state['enabled'],
+                previous_ttl_seconds=old_ttl,new_ttl_seconds=state['ttl'],candidate_enabled=candidate,candidate_ttl_seconds=desired_ttl,
+                thresholds=options.model_dump(),inputs=inputs)
             self.history.append(decision)
             if changed and self.on_change:self.on_change(rule,decision)
             if self.listener:self.listener(decision)

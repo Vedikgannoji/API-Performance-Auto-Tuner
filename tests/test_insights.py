@@ -177,7 +177,7 @@ def test_proxy_advisory_screen_preserves_forwarding(config,request_headers,respo
             assert row['cache_review_reason']==reason
             assert bool(row['request_key'])==(reason=='review_required')
             data=(await client.get('/_autotuner/insights')).json()
-            assert data['phase']==9 and data['session_id']==app.session_id
+            assert data['phase']==10 and data['session_id']==app.session_id
             assert not data['recommendations_applied']
             assert 'unretained' not in json.dumps(data) and 'secret=value' not in json.dumps(data)
             assert (await client.get('/_autotuner/insights?window=0')).status_code==400

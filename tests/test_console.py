@@ -44,7 +44,7 @@ def test_assets_snapshot_playground_and_cache_isolation(config):
                 assert (await client.post('/_autotuner/'+path)).status_code==405
             data=(await client.get('/_autotuner/dashboard/data')).json()
             assert data['metrics']['summary']['count']==0 and data['series'][0]['p95_ms'] is None
-            assert len(data['policies'])==1 and data['status']['phase']==9
+            assert len(data['policies'])==1 and data['status']['phase']==10
             assert 'cache' not in data['policies'][0] and 'decision_history' not in data['policies'][0]
             for _ in range(2):
                 response=await client.post('/_autotuner/playground/request',json={'path':'/items'},headers={'Cookie':'ambient=secret','Cache-Control':'no-cache'})

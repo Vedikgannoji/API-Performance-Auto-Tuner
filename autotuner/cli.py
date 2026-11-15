@@ -68,6 +68,7 @@ def parser():
     serve.add_argument('--shutdown-timeout', type=int, default=5)
     doctor = commands.add_parser('doctor', help='Offline checks; optional explicit TCP connectivity check')
     doctor.add_argument('--connect', action='store_true')
+    doctor.add_argument('--session',action='store_true',help='Explicitly query the running local session and uptime')
     status = commands.add_parser('status', help='Query an already running local control session')
     endpoints = commands.add_parser('endpoints', help='Query observed route metrics')
     endpoints.add_argument('--window', type=int, default=60)
@@ -96,6 +97,15 @@ def parser():
     explain=cache_commands.add_parser('explain')
     explain.add_argument('route')
     clear=cache_commands.add_parser('clear')
+    benchmark=commands.add_parser('benchmark',help='Run explicit isolated HTTP qualification; never targets your upstream')
+    benchmark.add_argument('--profile',choices=['quick','qualification','soak'],default='quick')
+    for name in ('requests','concurrency','repeats','orders','rate','duration-seconds'):
+        benchmark.add_argument('--'+name,type=int)
+    benchmark.add_argument('--reference-host',action='store_true',help='Attest the PRD reference host is allocated for this run')
+    benchmark.add_argument('--require-gates',action='store_true',help='Exit 3 for failed or missing qualification gates')
+    benchmark.add_argument('--format',choices=['json','csv'],default='json')
+    benchmark.add_argument('--output',required=True)
+    benchmark.add_argument('--force',action='store_true')
     for sub in (check, serve, doctor, status, endpoints, insights, sessions, report_command, explain, clear, dashboard, preview, run):
         sub.add_argument('--config', default=None)
         sub.add_argument('--upstream', default=None)
@@ -152,12 +162,41 @@ def main(argv=None):
                 file.write(config.model_dump_json(indent=2) + '\n')
             emit({'schema_version': 1, 'created': str(path), 'mode': 'observe'}, args.json)
             return 0
+        if args.command=='benchmark':
+            from .benchmarking import Options,run,report_csv,exit_code
+            values={name:getattr(args,name) for name in ('profile','requests','concurrency','repeats','orders','rate','duration_seconds','reference_host') if getattr(args,name) is not None}
+            if args.profile=='qualification':
+                values.setdefault('requests',120);values.setdefault('orders',50000)
+            if args.profile=='soak':
+                values.setdefault('duration_seconds',1800);values.setdefault('orders',50000);values.setdefault('requests',100)
+            options=Options.model_validate(values)
+            output=Path(args.output)
+            # Reserve before sending any traffic, and never overwrite without --force.
+            with output.open('w' if args.force else 'x',encoding='utf-8',newline='') as file:
+                try:
+                    data=run(options,progress=lambda message:print(message,file=sys.stderr,flush=True))
+                except KeyboardInterrupt:
+                    file.write(json.dumps(dict(schema_version=1,state='interrupted',qualification_complete=False,
+                        note='Owned servers stopped; this file is not performance evidence.'))+'\n')
+                    return 3
+                except (RuntimeError,OSError):
+                    file.write(json.dumps(dict(schema_version=1,state='interrupted_or_runtime_failure',qualification_complete=False,
+                        note='Owned servers are stopped; this file is not performance evidence.'))+'\n')
+                    raise
+                file.write(report_csv(data) if args.format=='csv' else json.dumps(data,indent=2)+'\n')
+            print('Benchmark report: '+str(output)+'; qualification requires review of all gates.',file=sys.stderr)
+            return exit_code(data,args.require_gates)
         config = resolved_config(args)
         if args.command == 'config':
             emit({'schema_version': 1, 'valid': True, 'config': config.model_dump()}, args.json)
         elif args.command == 'doctor':
             result = {'schema_version': 1, 'config_valid': True, 'python': sys.version.split()[0],
-                      'forwarding_available': True, 'upstream_check': 'not_requested'}
+                      'forwarding_available': True, 'upstream_check': 'not_requested','limits':config.limits.model_dump(),
+                      'session_check':'not_requested'}
+            if args.session:
+                session=local_json(config,'GET','/_autotuner/status')
+                result.update(session_check='reachable',session_uptime_seconds=session.get('uptime_seconds'),
+                              session_running=session.get('running'),session_limits=session.get('limits'))
             if args.connect:
                 upstream = urlsplit(config.upstream)
                 with socket.create_connection((upstream.hostname, upstream.port or (443 if upstream.scheme == 'https' else 80)), timeout=2):
@@ -267,7 +306,7 @@ def main(argv=None):
                     raise ControlError('Invalid local session response') from exc
             if (not isinstance(data, dict) or data.get('schema_version') != 1 or
                 not isinstance(data.get('session_id'), str) or
-                (args.command == 'status' and data.get('phase') not in (3, 4, 5, 6, 7, 8, 9)) or
+                (args.command == 'status' and data.get('phase') not in (3, 4, 5, 6, 7, 8, 9, 10)) or
                 (args.command == 'endpoints' and not isinstance(data.get('routes'), dict)) or
                 (args.command == 'insights' and (not isinstance(data.get('findings'), list) or not isinstance(data.get('cache_suitability'), list) or data.get('recommendations_applied') is not False))):
                 raise ControlError('Listener did not return a compatible control session')
@@ -292,6 +331,9 @@ def main(argv=None):
         return 0
     except ControlError as exc:
         print(str(exc),file=sys.stderr)
+        return 1
+    except RuntimeError:
+        print('Isolated benchmark failed; check local socket permissions and the installed package. No qualification result was obtained.',file=sys.stderr)
         return 1
     except ValidationError as exc:
         locations = ['.'.join(map(str, item['loc'])) or 'configuration' for item in exc.errors(include_input=False)]

@@ -6,17 +6,32 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.11', '3.12', '3.13']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: pip install -e ".[test]"
+      - run: pip install -e ".[test,benchmark]"
       - run: autotuner --version
       - run: node --test tests/workflow.test.cjs tests/product_ui.test.cjs
-      - run: python -m pytest
+      - run: python -m pytest --junitxml=tmp/test-results.xml
+      - run: python -m autotuner.quality coverage.json
       - run: python -m pip wheel . --no-deps --wheel-dir dist
+      - run: python scripts/smoke_wheel.py dist/api_performance_auto_tuner-2.0.0-py3-none-any.whl
+      - run: autotuner benchmark --profile quick --requests 20 --orders 2000 --output tmp/qualification-quick.json
+      - run: autotuner benchmark --profile soak --duration-seconds 2 --requests 20 --orders 64 --output tmp/soak-smoke.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evidence-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            coverage.json
+            tmp/test-results.xml
+            tmp/qualification-quick.json
+            tmp/soak-smoke.json
+            dist/*.whl

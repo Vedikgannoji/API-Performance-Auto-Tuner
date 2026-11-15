@@ -1,6 +1,8 @@
 # Self-Optimizing API Performance Monitoring System
 
-The installable CLI now includes the **Phase 9 product dashboard and declarative scenario runner**. It runs beside the generic proxy, independently of the original demo below. Start your upstream, run `autotuner serve --config examples/adaptive-demo.json`, then open `autotuner dashboard --config examples/adaptive-demo.json` in another terminal. The product dashboard is at `http://127.0.0.1:8080/_autotuner/dashboard`; the proxy root continues forwarding to your upstream.
+The installable CLI includes the product dashboard, declarative scenario runner and **Phase 10 reliability tooling**. It runs beside the generic proxy, independently of the original demo below. Start your upstream, run `autotuner serve --config examples/adaptive-demo.json`, then open `autotuner dashboard --config examples/adaptive-demo.json` in another terminal. The product dashboard is at `http://127.0.0.1:8080/_autotuner/dashboard`; the proxy root continues forwarding to your upstream.
+
+For isolated product qualification, install `python -m pip install -e ".[test,benchmark]"` and run `autotuner benchmark --profile quick --output product-quick.json`. It starts/stops its own temporary SQL upstream and proxy, without targeting your running application. See the [Phase 10 review guide](docs/product/PHASE_10_RELIABILITY_EVIDENCE.md) for all startup/test commands, real-HTTP evidence boundaries, reference-host gates, full paired/soak profiles and CI. Check independent core floors with `python -m autotuner.quality coverage.json` after pytest. These tools do not by themselves establish a passed release qualification.
 
 See the [Phase 9 review guide](docs/product/PHASE_09_DASHBOARD_SCENARIOS.md) for complete install/start/test commands, generic scenario syntax, bounds and review steps. Browser assets have no build step or Node dependency. Optional developer JavaScript checks run with `node --test tests/workflow.test.cjs tests/product_ui.test.cjs`; pytest skips the two Python/JavaScript integrations when Node is absent. The historical demo sections below describe port 8000, not the product console.
 
@@ -89,7 +91,7 @@ python scripts/benchmark.py --orders 50000 --requests 120 --concurrency 8 --repe
 
 Coverage includes every Python module in `autotuner`, with branch reporting and an enforced 90% combined coverage floor. The benchmark starts fresh single-worker HTTP servers, uses real SQL sales aggregation without artificial sleeps, alternates baseline/adaptive order, validates response hashes and status codes, and saves raw client timings plus cache decisions to `benchmarks/latest.json`. Adaptive rounds include cold policy learning. It exits unsuccessfully if the median mean-latency reduction is below 20%.
 
-**Evidence:** Phase-specific current results are in `docs/product/phase_09_validation.json`. Earlier demo results and the retained user-run HTTP benchmark (73.54% median mean-latency reduction for its workload) predate the product proxy; they are not current product performance evidence. See [test guide](docs/TEST_GUIDE.md) and [delivery status](docs/IMPLEMENTATION_STATUS.md) for the historical demo boundary.
+**Evidence:** Phase-specific current results are in `docs/product/phase_10_validation.json`. Earlier demo results and the retained user-run HTTP benchmark (73.54% median mean-latency reduction for its workload) predate the product proxy; they are not current product performance evidence. See [test guide](docs/TEST_GUIDE.md) and [delivery status](docs/IMPLEMENTATION_STATUS.md) for the historical demo boundary.
 
 ## Configuration and scope
 

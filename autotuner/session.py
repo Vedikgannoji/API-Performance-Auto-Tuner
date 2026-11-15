@@ -1,4 +1,6 @@
-"""Phase 9 proxy session and loopback control endpoints."""
+"""Phase 10 proxy session and loopback control endpoints."""
+import asyncio
+from time import perf_counter
 import uuid
 from urllib.parse import parse_qs
 
@@ -14,6 +16,7 @@ class ControlSession:
         self.config = config
         self.session_id = str(uuid.uuid4())
         self.running = False
+        self.started_monotonic = perf_counter()
         self.proxy = ObservationProxy(config, self.session_id, transport=transport)
         self.storage = TelemetryStorage(config, self.session_id, transport_counters=self.proxy.counters)
         self.proxy.cache.controller.listener=self.storage.record_decision
@@ -30,7 +33,11 @@ class ControlSession:
         self.storage.submit(boundary, row)
 
     def status(self):
-        return dict(schema_version=1, session_id=self.session_id, phase=9,
+        try:active_tasks=len(asyncio.all_tasks())
+        except RuntimeError:active_tasks=None
+        return dict(schema_version=1, session_id=self.session_id, phase=10,
+                    uptime_seconds=max(0,perf_counter()-self.started_monotonic),
+                    runtime=dict(in_flight=self.proxy.in_flight,hot_reads=self.proxy.hot_reads,active_tasks=active_tasks),
                     mode=self.config.mode, effective_mode=effective_mode(self.config), running=self.running,
                     upstream=self.config.upstream, listen=self.config.listen,
                     dashboard_url='http://'+self.config.listen+'/_autotuner/dashboard',
@@ -95,7 +102,7 @@ class ControlSession:
                     if path.endswith('/insights'):
                         result = analyze(self.config, self.proxy.metrics, self.proxy.upstream_metrics,
                                          transport=self.proxy.counters, storage=self.storage.health(), window=window)
-                        result.update(session_id=self.session_id, config_digest=self.storage.digest, phase=9,cache=self.proxy.cache.status())
+                        result.update(session_id=self.session_id, config_digest=self.storage.digest, phase=10,cache=self.proxy.cache.status())
                         for item in result['cache_suitability']:
                             policy=self.proxy.cache.rule(item['operation'].split(' ',1)[1])
                             if policy is not None:

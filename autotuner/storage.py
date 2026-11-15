@@ -1,5 +1,6 @@
 """Bounded, asynchronous SQLite duration distributions; no HTTP payload capture."""
 import asyncio
+from collections import Counter
 from concurrent.futures import Future
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -10,12 +11,27 @@ from pathlib import Path
 from queue import Empty, Full, Queue
 import sqlite3
 from threading import Thread
-from time import time
+from time import time,perf_counter
 
 TOOL_VERSION = '2.0.0'
 SCHEMA_VERSION = 1
 MAX_SESSIONS = 100
 APPLICATION_ID = 0x4154554E
+BATCH_SECONDS = .02
+BATCH_LIMIT = 64
+
+
+def collect_events(first,queue,*,clock=perf_counter):
+    """Coalesce a bounded interval of events; exports/close preserve FIFO barriers."""
+    batch=[first];deadline=clock()+BATCH_SECONDS
+    while len(batch)<BATCH_LIMIT:
+        remaining=deadline-clock()
+        if remaining<=0:break
+        try:following=queue.get(timeout=remaining)
+        except Empty:break
+        if following[0]!='event':return batch,following
+        batch.append(following[1])
+    return batch,None
 
 
 class StorageUnavailable(OSError):
@@ -136,14 +152,17 @@ class TelemetryStorage:
         self.disk_bytes = 0
         self.decision_sequence=0
         self.stats.update(persisted_tuning_decisions=0,dropped_tuning_decisions=0,tuning_decisions_truncated=0)
+        self.stats.update(write_batches=0,largest_batch_observations=0)
 
     def health(self):
         return dict(persistent=self.state in ('ready', 'closed'), state=self.state, last_error=self.last_error,
+                    writer_batch_window_ms=BATCH_SECONDS*1000,writer_batch_limit=BATCH_LIMIT,
                     queue_depth=self.queue.qsize(), queue_capacity=self.queue.maxsize, disk_bytes=self.disk_bytes,
                     disk_budget_bytes=self.config.metrics.storage_max_bytes,
                     tuning_history_may_be_incomplete=bool(self.stats['dropped_tuning_decisions'] or self.stats['tuning_decisions_truncated']),transport=dict(self.transport_counters), **self.stats,
                     sampling_incomplete=bool(self.stats['dropped_queue'] or self.stats['dropped_storage'] or
-                                             self.stats['retention_truncated'] or self.stats['budget_truncated'] or self.stats['dropped_tuning_decisions']))
+                                               self.stats['retention_truncated'] or self.stats['budget_truncated'] or
+                                               self.stats['dropped_tuning_decisions'] or self.stats['tuning_decisions_truncated']))
 
     def submit(self, stream, row):
         if not self.accepting:
@@ -290,6 +309,44 @@ class TelemetryStorage:
             connection.execute('DELETE FROM sessions WHERE id=?', (session,))
             self.stats['sessions_truncated'] += 1
 
+    def _reclaim_budget(self,connection):
+        """Audit rows also consume the bounded DB; disclose eviction to their session."""
+        oldest=connection.execute('SELECT session,sequence FROM decisions ORDER BY created,sequence LIMIT 8').fetchall()
+        if not oldest:return self._truncate(connection,budget=True)
+        # Removing one small row need not release a SQLite page. Reclaim a bounded
+        # group so the retry can obtain page-level space instead of exhausting
+        # its attempts while deleting fragments within still-occupied pages.
+        connection.executemany('DELETE FROM decisions WHERE session=? AND sequence=?',oldest)
+        for session,count in Counter(session for session,sequence in oldest).items():
+            if session==self.session_id:
+                self.stats['tuning_decisions_truncated']+=count
+                continue
+            row=connection.execute('SELECT health FROM sessions WHERE id=?',(session,)).fetchone()
+            if row is not None:
+                health=json.loads(row[0]);health['tuning_decisions_truncated']=health.get('tuning_decisions_truncated',0)+count
+                health.update(tuning_history_may_be_incomplete=True,sampling_incomplete=True)
+                connection.execute('UPDATE sessions SET health=? WHERE id=?',(json.dumps(health),session))
+        return True
+
+    def _write_decision(self,connection,data):
+        sequence,created,decision=data
+        for attempt in range(9):
+            try:
+                with connection:
+                    self._maintain(connection)
+                    removed=connection.execute('DELETE FROM decisions WHERE session=? AND sequence NOT IN '
+                        '(SELECT sequence FROM decisions WHERE session=? ORDER BY sequence DESC LIMIT ?)',
+                        (self.session_id,self.session_id,max(0,self.config.tuning.history_capacity-1))).rowcount
+                    connection.execute('INSERT INTO decisions VALUES(?,?,?,?)',(self.session_id,sequence,created,json.dumps(decision)))
+                self.stats['tuning_decisions_truncated']+=removed
+                self.stats['persisted_tuning_decisions']+=1
+                self.state,self.last_error='ready',None
+                return
+            except sqlite3.Error as exc:
+                if getattr(exc,'sqlite_errorcode',None)!=sqlite3.SQLITE_FULL or attempt==8:raise
+                with connection:
+                    if not self._reclaim_budget(connection):raise
+
     def _checkpoint(self, connection, ended=None):
         for _ in range(MAX_SESSIONS + 64):
             self.disk_bytes = sum(p.stat().st_size for p in (self.path, Path(str(self.path)+'-journal'), Path(str(self.path)+'.writer-lock')) if p.exists())
@@ -303,7 +360,7 @@ class TelemetryStorage:
                 if getattr(exc, 'sqlite_errorcode', None) != sqlite3.SQLITE_FULL:
                     raise
                 with connection:
-                    if self._truncate(connection, budget=True):
+                    if self._reclaim_budget(connection):
                         continue
                     oldest = connection.execute('SELECT id FROM sessions WHERE id!=? ORDER BY started,id LIMIT 1', (self.session_id,)).fetchone()
                     if oldest is None:
@@ -316,20 +373,20 @@ class TelemetryStorage:
     def _write(self, connection, batch):
         rows = [(self.session_id, int(r['timestamp']//60), stream, r['method'], r['route'], r['status'],
                  r['cache'], r['duration_ms'], 1) for stream, r in batch]
-        for attempt in range(2):
+        for attempt in range(9):
             try:
                 with connection:
                     self._maintain(connection)
                     connection.executemany('INSERT INTO samples VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT DO UPDATE SET n=n+1', rows)
                 self.stats['persisted_observations'] += len(rows)
+                self.stats['write_batches']+=1
+                self.stats['largest_batch_observations']=max(self.stats['largest_batch_observations'],len(rows))
                 self.state, self.last_error = 'ready', None
                 return
             except sqlite3.Error as exc:
-                if getattr(exc, 'sqlite_errorcode', None) == sqlite3.SQLITE_FULL and attempt == 0:
+                if getattr(exc, 'sqlite_errorcode', None) == sqlite3.SQLITE_FULL and attempt < 8:
                     with connection:
-                        while self._truncate(connection, budget=True):
-                            # Free one oldest bucket; retry the bounded batch once.
-                            break
+                        if not self._reclaim_budget(connection):raise
                     continue
                 raise
 
@@ -371,28 +428,10 @@ class TelemetryStorage:
                     self._checkpoint(connection, self.clock())
                     break
                 if kind == 'decision':
-                    sequence,created,decision=data
-                    with connection:
-                        self._maintain(connection)
-                        removed=connection.execute('DELETE FROM decisions WHERE session=? AND sequence NOT IN (SELECT sequence FROM decisions WHERE session=? ORDER BY sequence DESC LIMIT ?)',
-                                           (self.session_id,self.session_id,max(0,self.config.tuning.history_capacity-1)))
-                        trimmed=removed.rowcount
-                        connection.execute('INSERT INTO decisions VALUES(?,?,?,?)',(self.session_id,sequence,created,json.dumps(decision)))
-                    self.stats['tuning_decisions_truncated']+=trimmed
-                    self.stats['persisted_tuning_decisions']+=1
-                    self.state,self.last_error='ready',None
+                    self._write_decision(connection,data)
                     written=True
                 elif kind == 'event':
-                    batch = [data]
-                    while len(batch) < 64:
-                        try:
-                            following = self.queue.get_nowait()
-                        except Empty:
-                            break
-                        if following[0] != "event":
-                            pending = following
-                            break
-                        batch.append(following[1])
+                    batch,pending=collect_events(data,self.queue)
                     self._write(connection, batch)
                     written = True
                 else:
