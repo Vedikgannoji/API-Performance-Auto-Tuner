@@ -77,7 +77,7 @@ class ObservationProxy:
         self.slots = asyncio.Semaphore(config.limits.upstream_concurrency)
         self.in_flight = 0
         self.hot_reads = 0
-        self.cache = ResponseCache(config)
+        self.cache = ResponseCache(config,session_id=session_id)
         self.client = httpx.AsyncClient(
             transport=transport, trust_env=False, follow_redirects=False, verify=True,
             cookies=CookieJar(policy=RejectCookies()),
@@ -119,6 +119,10 @@ class ObservationProxy:
         queue_elapsed_ms = 0.0
         review_reason, request_key = 'not_observed', None
         outcome, reason = 'BYPASS', 'not_evaluated'
+        tuning_read=tuning_recorded=False
+        assessment=None
+        assessment_reason='not_observed'
+        delivered=0
 
         async def downstream(message):
             await asyncio.wait_for(send(message), self.config.limits.read_timeout_seconds)
@@ -189,7 +193,7 @@ class ObservationProxy:
                 target = self.base.copy_with(raw_path=raw_path + (b'?' + scope['query_string'] if scope.get('query_string') else b''))
             except httpx.InvalidURL:
                 return await reject(400, 'Invalid request target')
-            if self.config.mode=='cache' and any(token.strip().split(b'=',1)[0].lower()==b'only-if-cached'
+            if self.config.mode in ('cache','adaptive','recommend') and any(token.strip().split(b'=',1)[0].lower()==b'only-if-cached'
                     for value in values.get(b'cache-control',[]) for token in value.split(b',')):
                 reason='only_if_cached_unsupported'
                 return await reject(504,'only-if-cached is unsupported; no upstream request was made')
@@ -257,6 +261,7 @@ class ObservationProxy:
                 await asyncio.wait_for(self.slots.acquire(),self.config.limits.connect_timeout_seconds)
                 acquired=True
                 finish_queue()
+            tuning_read=bool(candidate and rule and rule.policy=='adaptive' and self.config.mode in ('adaptive','recommend'))
             outgoing=filtered_headers(headers,request=True)
             outgoing=[(k,v) for k,v in outgoing if k!=b'x-autotuner-proxy']
             outgoing.append((b'x-autotuner-proxy',b', '.join([h.strip() for h in hops if h.strip()]+[self.session_id.encode()])))
@@ -287,6 +292,11 @@ class ObservationProxy:
                 fields=[target.raw_path]+[b'\x00'.join(values.get(name,[])) for name in (b'accept',b'accept-encoding')]
                 material=b''.join(len(value).to_bytes(8,'big')+value for value in fields)
                 request_key=hmac.new(self.reuse_salt,material,hashlib.sha256).hexdigest()
+            if tuning_read:
+                assessment,assessment_reason=self.cache.assess(rule,raw_headers,response.status_code,received=received,sent=sent)
+                if assessment is None and generation==self.cache.generations[rule.id] and not self.cache.writes[rule.id]:
+                    self.cache.controller.observe(rule,key,upstream_elapsed*1000,failed=True,reason='uncacheable_'+assessment_reason)
+                    tuning_recorded=True
             if candidate:
                 if upstream_lengths and int(upstream_lengths[0])>self.config.limits.cache_entry_bytes:
                     reason='entry_too_large'
@@ -298,6 +308,9 @@ class ObservationProxy:
                         self.cache.discard(fill)
                         fill,reason=None,'entry_too_large'
                 if fill is None:outcome='BYPASS'
+            if candidate and ((tuning_read and assessment is not None) or fill is not None):
+                review_reason='review_required'
+                request_key=hmac.new(self.reuse_salt,key.encode(),hashlib.sha256).hexdigest()
             status=response.status_code
             response_started=True
             await downstream({'type':'http.response.start','status':status,'headers':diagnostics(filtered_headers(raw_headers))})
@@ -312,16 +325,27 @@ class ObservationProxy:
                         upstream_elapsed+=perf_counter()-upstream_start
                         upstream_start=None
                     delivered+=len(chunk)
-                    if fill is not None and fill.active and not self.cache.append(fill,chunk):reason='entry_or_buffer_capacity'
+                    if fill is not None and fill.active and not self.cache.append(fill,chunk):
+                        reason='entry_or_buffer_capacity'
+                        review_reason,request_key='capacity',None
                     await downstream({'type':'http.response.body','body':chunk,'more_body':True})
                 if upstream_lengths and delivered!=int(upstream_lengths[0]):
                     raise httpx.RemoteProtocolError('Incomplete upstream framing')
             upstream_complete=True
             await downstream({'type':'http.response.body','body':b'','more_body':False})
             completed=True
+            if tuning_read and not tuning_recorded and generation==self.cache.generations[rule.id] and not self.cache.writes[rule.id]:
+                metadata=256+len(key)+sum(len(k)+len(v) for k,v in assessment['headers']) if assessment else 0
+                too_large=metadata+delivered>self.config.limits.cache_entry_bytes or metadata+delivered>self.config.limits.cache_bytes
+                if too_large:review_reason,request_key='capacity',None
+                self.cache.controller.observe(rule,key,upstream_elapsed*1000,failed=too_large,reason='capacity' if too_large else 'origin_sample')
+                tuning_recorded=True
             if fill is not None and fill.active:
                 reason='stored' if self.cache.publish(fill) else 'invalidated_or_expired_fill'
         except (httpx.TimeoutException,asyncio.TimeoutError):
+            if tuning_read and not tuning_recorded and stage=='upstream' and generation==self.cache.generations[rule.id] and not self.cache.writes[rule.id]:
+                self.cache.controller.observe(rule,key,0,failed=True,reason='upstream_failure')
+                tuning_recorded=True
             self.counters['failed_requests']+=1
             if response_started:raise IncompleteResponse('Response interrupted after headers') from None
             if stage=='queue':self.counters['overload_rejections']+=1
@@ -329,6 +353,9 @@ class ObservationProxy:
             await reject(408 if stage=='request' else 503 if stage=='queue' else 504,
                          'Request body timed out' if stage=='request' else 'Proxy admission timed out' if stage=='queue' else 'Upstream timed out')
         except (httpx.HTTPError,OSError):
+            if tuning_read and not tuning_recorded and generation==self.cache.generations[rule.id] and not self.cache.writes[rule.id]:
+                self.cache.controller.observe(rule,key,0,failed=True,reason='upstream_failure')
+                tuning_recorded=True
             self.counters['failed_requests']+=1
             if response_started:raise IncompleteResponse('Response interrupted after headers') from None
             await reject(502,'Upstream request failed')

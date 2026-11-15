@@ -238,7 +238,7 @@ def test_phase_four_never_serves_a_shared_response_cache(mode):
         for _ in range(2):
             assert (await request(app)).content == b'live'
         assert len(calls) == 2
-        assert app.status()['effective_mode'] == 'observe'
+        assert app.status()['effective_mode'] == mode
         assert app.proxy.metrics.snapshot()['summary']['cache_hits'] == 0
         await app.proxy.close()
     asyncio.run(scenario())

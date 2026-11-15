@@ -1,4 +1,5 @@
 """Installable observation-proxy command interface."""
+from contextlib import contextmanager
 import argparse
 import json
 import logging
@@ -8,6 +9,7 @@ import socket
 import sys
 from urllib.parse import urlsplit
 import urllib.request
+import urllib.error
 
 from pydantic import ValidationError
 
@@ -19,13 +21,34 @@ from .reporting import serialize_report
 VERSION = '2.0.0'
 
 
+class ControlError(OSError):
+    """A sanitized and actionable local-control diagnostic."""
+
+
+@contextmanager
+def control_open(opener, request, listen, timeout):
+    try:
+        with opener.open(request,timeout=timeout) as response:
+            yield response
+    except urllib.error.HTTPError as exc:
+        raise ControlError(f'Local proxy returned HTTP {exc.code}; inspect the proxy terminal and confirm its version and port.') from None
+    except urllib.error.URLError as exc:
+        if isinstance(exc.reason,TimeoutError):
+            raise ControlError('Local proxy request timed out; inspect the proxy terminal.') from None
+        raise ControlError(f'Cannot reach the local proxy at {listen}. Start autotuner serve with the same config in a separate terminal and leave it running.') from None
+    except TimeoutError:
+        raise ControlError('Local proxy request timed out; inspect the proxy terminal.') from None
+    except ConnectionError:
+        raise ControlError(f'Cannot reach the local proxy at {listen}. Keep its serve terminal running.') from None
+
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *args):
         return None
 
 
 def parser():
-    root = argparse.ArgumentParser(prog='autotuner', description='Local API proxy with opt-in fixed-TTL caching; observe by default.')
+    root = argparse.ArgumentParser(prog='autotuner', description='Local API proxy with opt-in static and adaptive caching; observe by default.')
     root.add_argument('--version', action='version', version='autotuner ' + VERSION)
     commands = root.add_subparsers(dest='command', required=True)
     init = commands.add_parser('init', help='Create an observe-mode JSON configuration')
@@ -63,7 +86,7 @@ def parser():
         sub.add_argument('--config', default=None)
         sub.add_argument('--upstream', default=None)
         sub.add_argument('--listen', default=None)
-        sub.add_argument('--mode', choices=['observe', 'recommend', 'cache', 'adaptive'], default=None)
+        sub.add_argument('--mode', choices=['observe', 'recommend', 'cache', 'adaptive', 'off'], default=None)
         sub.add_argument('--json', action='store_true')
     return root
 
@@ -123,19 +146,19 @@ def main(argv=None):
                 if args.command == 'report' and args.session:
                     endpoint += '?' + urlencode({'session': args.session})
                 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
-                with opener.open('http://' + config.listen + endpoint, timeout=10) as response:
+                with control_open(opener,'http://' + config.listen + endpoint,config.listen,10) as response:
                     try:
                         data = json.load(response)
                     except ValueError:
-                        raise OSError('Invalid report response') from None
+                        raise ControlError('Invalid report response') from None
                 if not isinstance(data, dict) or data.get('schema_version') != 1:
-                    raise OSError('Incompatible telemetry report')
+                    raise ControlError('Incompatible telemetry report')
                 if args.command == 'report' and (data.get('config_digest') != digest or not isinstance(data.get('routes'), list) or
                     not isinstance(data.get('sampling'), dict) or
                     any(not isinstance(data.get(key), str) for key in ('tool_version', 'source_sha256', 'session_id'))):
-                    raise OSError('Report configuration mismatch')
+                    raise ControlError('Report configuration mismatch')
                 if args.command == 'sessions' and not isinstance(data.get('sessions'), list):
-                    raise OSError('Invalid sessions response')
+                    raise ControlError('Invalid sessions response')
             else:
                 from contextlib import closing
                 with closing(connect_readonly(config.metrics.storage_path)) as connection:
@@ -159,11 +182,11 @@ def main(argv=None):
                 endpoint+='?'+urlencode({'path':args.route})
             opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),NoRedirect())
             request=urllib.request.Request('http://'+config.listen+endpoint,method='POST' if args.cache_command=='clear' else 'GET')
-            with opener.open(request,timeout=2) as response:
+            with control_open(opener,request,config.listen,2) as response:
                 try:data=json.load(response)
-                except ValueError:raise OSError('Invalid cache control response') from None
+                except ValueError:raise ControlError('Invalid cache control response') from None
             if not isinstance(data,dict) or data.get('schema_version')!=1 or not isinstance(data.get('session_id'),str) or not isinstance(data.get('cache'),dict):
-                raise OSError('Incompatible cache control session')
+                raise ControlError('Incompatible cache control session')
             emit(data,args.json)
         elif args.command in ('status', 'endpoints', 'insights'):
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
@@ -172,17 +195,17 @@ def main(argv=None):
                 if not 1 <= args.window <= 3600:
                     raise ValueError('Invalid metrics window')
                 endpoint = ('/_autotuner/insights' if args.command == 'insights' else '/_autotuner/metrics') + '?window=' + str(args.window)
-            with opener.open('http://' + config.listen + endpoint, timeout=2) as response:
+            with control_open(opener,'http://' + config.listen + endpoint,config.listen,2) as response:
                 try:
                     data = json.load(response)
                 except ValueError as exc:
-                    raise OSError('Invalid local session response') from exc
+                    raise ControlError('Invalid local session response') from exc
             if (not isinstance(data, dict) or data.get('schema_version') != 1 or
                 not isinstance(data.get('session_id'), str) or
-                (args.command == 'status' and data.get('phase') not in (3, 4, 5, 6, 7)) or
+                (args.command == 'status' and data.get('phase') not in (3, 4, 5, 6, 7, 8)) or
                 (args.command == 'endpoints' and not isinstance(data.get('routes'), dict)) or
                 (args.command == 'insights' and (not isinstance(data.get('findings'), list) or not isinstance(data.get('cache_suitability'), list) or data.get('recommendations_applied') is not False))):
-                raise OSError('Listener did not return a compatible control session')
+                raise ControlError('Listener did not return a compatible control session')
             emit(data, args.json)
         else:
             if args.shutdown_timeout < 1:
@@ -194,13 +217,16 @@ def main(argv=None):
                 raise ValueError('Use serve --check --json or status --json; foreground serve emits diagnostics on stderr')
             import uvicorn
             host, port = config.listen.rsplit(':', 1)
-            print('Proxy enabled; fixed-TTL caching is opt-in through cache mode and explicit cache rules. Adaptive tuning is not enabled.',file=sys.stderr)
+            print('Proxy enabled; fixed-TTL caching is opt-in through cache mode and explicit cache rules. Adaptive tuning requires adaptive mode and approved adaptive rules.',file=sys.stderr)
             logging.basicConfig(level=logging.INFO, stream=sys.stderr)
             logging.getLogger('httpx').setLevel(logging.WARNING)
             logging.getLogger('httpcore').setLevel(logging.WARNING)
             uvicorn.run(ControlSession(config), host=host.strip('[]'), port=int(port),
                         log_config=None, access_log=False, server_header=False, date_header=False, timeout_graceful_shutdown=args.shutdown_timeout)
         return 0
+    except ControlError as exc:
+        print(str(exc),file=sys.stderr)
+        return 1
     except ValidationError as exc:
         locations = ['.'.join(map(str, item['loc'])) or 'configuration' for item in exc.errors(include_input=False)]
         print('Invalid configuration fields: ' + ', '.join(locations), file=sys.stderr)

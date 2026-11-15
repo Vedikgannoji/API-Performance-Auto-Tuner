@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "upstream": "http://127.0.0.1:3000",
+  "listen": "127.0.0.1:8080",
+  "mode": "adaptive",
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/api/products"
+    },
+    {
+      "method": "GET",
+      "path": "/api/products/*"
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/catalog"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/products/*"
+    }
+  ],
+  "limits": {
+    "upstream_concurrency": 8,
+    "queue_capacity": 64,
+    "request_body_bytes": 8388608,
+    "header_bytes": 65536,
+    "connect_timeout_seconds": 5,
+    "read_timeout_seconds": 30,
+    "response_timeout_seconds": 60,
+    "cache_bytes": 67108864,
+    "cache_entries": 256,
+    "cache_entry_bytes": 1048576
+  },
+  "cache": {
+    "routes": [
+      {
+        "id": "product-list",
+        "match": "/api/products",
+        "methods": [
+          "GET"
+        ],
+        "policy": "adaptive",
+        "ttl_min_seconds": 2,
+        "ttl_max_seconds": 10,
+        "vary_headers": [
+          "Accept",
+          "Accept-Encoding"
+        ],
+        "invalidate_on": [
+          {
+            "method": "PATCH",
+            "path": "/api/products/*"
+          }
+        ]
+      },
+      {
+        "id": "product-detail",
+        "match": "/api/products/*",
+        "methods": [
+          "GET"
+        ],
+        "policy": "adaptive",
+        "ttl_min_seconds": 2,
+        "ttl_max_seconds": 10,
+        "vary_headers": [
+          "Accept",
+          "Accept-Encoding"
+        ],
+        "invalidate_on": [
+          {
+            "method": "PATCH",
+            "path": "/api/products/*"
+          }
+        ]
+      },
+      {
+        "id": "catalog-report",
+        "match": "/api/reports/catalog",
+        "methods": [
+          "GET"
+        ],
+        "policy": "adaptive",
+        "ttl_min_seconds": 2,
+        "ttl_max_seconds": 10,
+        "vary_headers": [
+          "Accept",
+          "Accept-Encoding"
+        ],
+        "invalidate_on": [
+          {
+            "method": "PATCH",
+            "path": "/api/products/*"
+          }
+        ]
+      }
+    ]
+  },
+  "metrics": {
+    "raw_capacity": 10000,
+    "retention_days": 7,
+    "storage_max_bytes": 104857600,
+    "storage_path": "../.autotuner/adaptive-demo.sqlite3",
+    "writer_queue_capacity": 1024
+  },
+  "tuning": {
+    "sample_capacity": 20,
+    "minimum_samples": 4,
+    "reuse_minimum": 2,
+    "enable_ms": 0.1,
+    "retain_ms": 0.05,
+    "cooldown_seconds": 5.0,
+    "reuse_window_seconds": 60.0,
+    "learning_window_seconds": 300.0,
+    "history_capacity": 100
+  }
+}

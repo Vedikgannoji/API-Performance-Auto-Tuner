@@ -142,3 +142,23 @@ def test_session_lifecycle_and_unsupported_forwarding(tmp_path):
             assert (await client.post('/_autotuner/health')).status_code == 405
             assert (await client.options('/_autotuner/status')).status_code == 405
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize('failure,expected',[
+    ('refused','Cannot reach the local proxy at 127.0.0.1:8080'),
+    ('http','Local proxy returned HTTP 500'),
+    ('timeout','Local proxy request timed out'),
+    ('wrapped_timeout','Local proxy request timed out'),
+    ('reset','Cannot reach the local proxy'),
+])
+def test_local_control_failures_are_actionable_and_redacted(config,monkeypatch,capsys,failure,expected):
+    import urllib.error
+    error=(urllib.error.URLError(ConnectionRefusedError('sensitive reason')) if failure=='refused' else
+           urllib.error.HTTPError('http://127.0.0.1:8080/secret',500,'sensitive reason',{},io.BytesIO(b'sensitive body')) if failure=='http' else TimeoutError('sensitive reason'))
+    if failure=='wrapped_timeout':error=urllib.error.URLError(TimeoutError('sensitive reason'))
+    if failure=='reset':error=ConnectionResetError('sensitive reason')
+    opener=Mock(open=Mock(side_effect=error))
+    monkeypatch.setattr(cli.urllib.request,'build_opener',Mock(return_value=opener))
+    assert cli.main(['cache','explain','/api/products','--json'])==1
+    captured=capsys.readouterr()
+    assert expected in captured.err and 'sensitive' not in captured.err and not captured.out

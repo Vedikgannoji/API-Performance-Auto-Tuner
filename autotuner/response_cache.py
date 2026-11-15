@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 from time import perf_counter, time
+from .core.controller import AdaptiveController
 
 
 @dataclass
@@ -44,14 +45,14 @@ def matches(pattern, path):
 
 
 def effective_mode(config):
-    return 'cache' if config.mode=='cache' else 'observe'
+    return config.mode if config.mode in ('cache','adaptive','recommend','off') else 'observe'
 
 
 def request_reason(config, rule, method, headers):
-    if effective_mode(config)!='cache': return 'mode_observe'
+    if effective_mode(config) in ('observe','off'): return 'mode_'+effective_mode(config)
     if method!='GET': return 'method'
     if rule is None: return 'no_rule'
-    if rule.policy!='cache': return 'rule_observe'
+    if rule.policy=='observe' or (config.mode=='cache' and rule.policy!='cache'): return 'rule_observe'
     names={k.lower() for k,v in headers}
     if names & {b'authorization',b'cookie'}: return 'credentials'
     if b'range' in names or any(k.startswith(b'if-') for k in names): return 'conditional_or_range'
@@ -66,7 +67,7 @@ def representation_key(upstream, method, target, headers):
     return hashlib.sha256(json.dumps([upstream,method,target.hex(),variants],separators=(',',':')).encode()).hexdigest()
 
 
-def freshness(headers, rule, *, wall, received, sent):
+def freshness(headers, rule, *, wall, received, sent, preferred_ttl=None):
     values={}
     for k,v in headers: values.setdefault(k.lower(),[]).append(v)
     if b'set-cookie' in values: return None,'set_cookie'
@@ -115,7 +116,7 @@ def freshness(headers, rule, *, wall, received, sent):
     initial_age=max(max(0,wall-date_value) if date_value is not None else 0,age+max(0,received-sent))
     remaining=lifetime-initial_age
     if remaining<rule.ttl_min_seconds: return None,'freshness_below_minimum'
-    ttl=min(rule.ttl_min_seconds,rule.ttl_max_seconds,remaining)
+    ttl=min(max(rule.ttl_min_seconds,preferred_ttl if preferred_ttl is not None else rule.ttl_min_seconds),rule.ttl_max_seconds,remaining)
     # Store raw representation headers, reconstruct Age and Content-Length on a hit.
     normalized=tuple((k.lower(),v) for k,v in headers if k.lower() not in hops|named|{b'age',b'content-length',b'x-autotuner-cache',b'x-autotuner-cache-reason'})
     if date_value is None: normalized+=((b'date',formatdate(wall,usegmt=True).encode()),)
@@ -123,17 +124,36 @@ def freshness(headers, rule, *, wall, received, sent):
 
 
 class ResponseCache:
-    def __init__(self,config,*,clock=perf_counter,wall_clock=time):
+    def __init__(self,config,*,clock=perf_counter,wall_clock=time,session_id=None):
         self.config,self.clock,self.wall_clock=config,clock,wall_clock
         self.entries=OrderedDict()
         self.generations={r.id:0 for r in config.cache.routes}
         self.writes={r.id:0 for r in config.cache.routes}
         self.locks={}
         self.decisions={}
+        self.controller=AdaptiveController(config,clock=lambda:self.clock(),wall_clock=lambda:self.wall_clock(),session_id=session_id,on_change=self._tuning_changed)
         self.used_bytes=0
         self.retired=0
         self.counters=dict(hits=0,misses=0,bypasses=0,stores=0,evictions=0,expirations=0,
                            invalidations=0,coalesced_waiters=0,generation_rejections=0)
+
+    def _tuning_changed(self,rule,decision):
+        if not decision['new_enabled']:
+            self.invalidate([rule.id])
+        elif decision['new_ttl_seconds']<decision['previous_ttl_seconds']:
+            for entry in self.entries.values():
+                if entry.rule==rule.id:entry.expires=min(entry.expires,entry.received+decision['new_ttl_seconds'])
+
+    def serving(self,rule):
+        if self.config.mode not in ('cache','adaptive'):return False
+        if rule.policy=='cache':return True
+        return rule.policy=='adaptive' and self.config.mode=='adaptive' and self.controller.evaluate(rule)['enabled']
+
+    def assess(self,rule,headers,status,*,received,sent):
+        if status!=200:return None,'response_status'
+        if any(k.lower()==b'content-range' for k,v in headers):return None,'partial_response'
+        preferred=self.controller.evaluate(rule)['ttl_seconds'] if rule.policy=='adaptive' else None
+        return freshness(headers,rule,wall=self.wall_clock(),received=received,sent=sent,preferred_ttl=preferred)
 
     def rule(self,path):
         rules=[r for r in self.config.cache.routes if matches(r.match,path)]
@@ -147,6 +167,7 @@ class ResponseCache:
         self.counters[reason]+=1
 
     def contains(self,key,rule):
+        if not self.serving(rule):return False
         entry=self.entries.get(key)
         if entry is None or self.writes[rule.id]: return False
         if entry.expires<=self.clock() or entry.generation!=self.generations[rule.id]:
@@ -160,6 +181,7 @@ class ResponseCache:
         entry.pins+=1
         self.entries.move_to_end(key)
         self.counters['hits']+=1
+        if rule.policy=='adaptive':self.controller.hit(rule,key)
         return entry
 
     def release(self,entry):
@@ -170,7 +192,10 @@ class ResponseCache:
 
     def invalidate(self,ids=None):
         ids=set(self.generations if ids is None else ids)
-        for name in ids:self.generations[name]+=1
+        for name in ids:
+            self.generations[name]+=1
+            rule=next(r for r in self.config.cache.routes if r.id==name)
+            if rule.policy=="adaptive":self.controller.note_invalidation(rule)
         for key,entry in list(self.entries.items()):
             if entry.rule in ids:self._remove(key,'invalidations')
 
@@ -192,9 +217,10 @@ class ResponseCache:
         return True
 
     def begin_fill(self,key,rule,generation,headers,status,*,received,sent):
-        if status!=200:return None,'response_status'
-        info,reason=freshness(headers,rule,wall=self.wall_clock(),received=received,sent=sent)
+        info,reason=self.assess(rule,headers,status,received=received,sent=sent)
         if info is None:return None,reason
+        if not self.serving(rule):
+            return None,'recommend_only' if self.config.mode=='recommend' else 'learning_'+self.controller.evaluate(rule)['reason']
         cost=256+len(key)+sum(len(k)+len(v) for k,v in info['headers'])
         if cost>self.config.limits.cache_entry_bytes or not self._reserve(cost):return None,'capacity'
         return Fill(key=key,rule=rule.id,generation=generation,cost=cost,**info),'miss'
@@ -214,7 +240,10 @@ class ResponseCache:
             fill.chunks.clear()
 
     def publish(self,fill):
-        if (fill.generation!=self.generations[fill.rule] or self.writes[fill.rule] or fill.expires<=self.clock()):
+        rule=next(r for r in self.config.cache.routes if r.id==fill.rule)
+        active=self.serving(rule)
+        if rule.policy=="adaptive":fill.expires=min(fill.expires,fill.received+self.controller.evaluate(rule)["ttl_seconds"])
+        if (not active or fill.generation!=self.generations[fill.rule] or self.writes[fill.rule] or fill.expires<=self.clock()):
             self.counters['generation_rejections']+=1
             self.discard(fill)
             return False
@@ -248,12 +277,14 @@ class ResponseCache:
     def explain(self,path):
         rule=self.rule(path)
         return dict(rule=rule.model_dump() if rule else None, effective_mode=effective_mode(self.config),
-                    serving_enabled=bool(rule and rule.policy=='cache' and effective_mode(self.config)=='cache'),
-                    ttl_strategy='fixed policy minimum; origin freshness cap enforced',
+                    serving_enabled=bool(rule and self.serving(rule)),
+                    tuning=self.controller.evaluate(rule) if rule and rule.policy=='adaptive' else None,
+                    decision_history=[d for d in self.controller.history if rule and d['rule_id']==rule.id],
+                    ttl_strategy='bounded adaptive preference; origin freshness cap enforced' if rule and rule.policy=='adaptive' else 'fixed policy minimum; origin freshness cap enforced',
                     write_in_progress=bool(rule and self.writes[rule.id]),
                     last_decision=self.decisions.get(rule.id) if rule else None,cache=self.status())
 
     def status(self):
-        return dict(mode=effective_mode(self.config),rules_enabled=sum(r.policy=='cache' and effective_mode(self.config)=='cache' for r in self.config.cache.routes),entries=len(self.entries),accounted_bytes=self.used_bytes,
+        return dict(mode=effective_mode(self.config),rules_enabled=sum(self.serving(r) for r in self.config.cache.routes),entries=len(self.entries),accounted_bytes=self.used_bytes,
                     byte_budget=self.config.limits.cache_bytes,retired_pinned_entries=self.retired,
                     coordination_keys=len(self.locks),active_writes=sum(self.writes.values()),**self.counters)

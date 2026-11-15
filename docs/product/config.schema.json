@@ -249,6 +249,76 @@
       ],
       "title": "RoutePolicy",
       "type": "object"
+    },
+    "TuningConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "sample_capacity": {
+          "default": 20,
+          "maximum": 100,
+          "minimum": 2,
+          "title": "Sample Capacity",
+          "type": "integer"
+        },
+        "minimum_samples": {
+          "default": 4,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Minimum Samples",
+          "type": "integer"
+        },
+        "reuse_minimum": {
+          "default": 2,
+          "maximum": 100,
+          "minimum": 2,
+          "title": "Reuse Minimum",
+          "type": "integer"
+        },
+        "enable_ms": {
+          "default": 2.0,
+          "exclusiveMinimum": 0,
+          "maximum": 60000,
+          "title": "Enable Ms",
+          "type": "number"
+        },
+        "retain_ms": {
+          "default": 1.5,
+          "exclusiveMinimum": 0,
+          "maximum": 60000,
+          "title": "Retain Ms",
+          "type": "number"
+        },
+        "cooldown_seconds": {
+          "default": 5.0,
+          "maximum": 3600,
+          "minimum": 0,
+          "title": "Cooldown Seconds",
+          "type": "number"
+        },
+        "reuse_window_seconds": {
+          "default": 60.0,
+          "exclusiveMinimum": 0,
+          "maximum": 3600,
+          "title": "Reuse Window Seconds",
+          "type": "number"
+        },
+        "learning_window_seconds": {
+          "default": 300.0,
+          "exclusiveMinimum": 0,
+          "maximum": 86400,
+          "title": "Learning Window Seconds",
+          "type": "number"
+        },
+        "history_capacity": {
+          "default": 100,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "History Capacity",
+          "type": "integer"
+        }
+      },
+      "title": "TuningConfig",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -274,7 +344,8 @@
         "observe",
         "recommend",
         "cache",
-        "adaptive"
+        "adaptive",
+        "off"
       ],
       "title": "Mode",
       "type": "string"
@@ -295,6 +366,9 @@
     },
     "metrics": {
       "$ref": "#/$defs/MetricsConfig"
+    },
+    "tuning": {
+      "$ref": "#/$defs/TuningConfig"
     }
   },
   "required": [

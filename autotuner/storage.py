@@ -38,7 +38,9 @@ def utc(timestamp):
 def config_identity(config):
     data = config.model_dump()
     data["metrics"]["storage_path"] = str(Path(config.metrics.storage_path).resolve())
-    digest = hashlib.sha256(json.dumps(data, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    identity_data=dict(data)
+    if config.tuning.model_dump()==type(config.tuning)().model_dump():identity_data.pop("tuning")
+    digest = hashlib.sha256(json.dumps(identity_data, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     data['upstream'] = config.upstream.split(':', 1)[0] + '://{upstream}'
     data['listen'] = 'loopback'
     data['metrics']['storage_path'] = '{local_storage}'
@@ -103,12 +105,18 @@ def report(connection, digest, session_id=None):
     health['sampling_may_be_incomplete'] = bool(health.get('sampling_incomplete') or meta[1] is None or health.get('queue_depth'))
     health['durability_boundary'] = 'last committed writer checkpoint; pending or abrupt-exit observations may be absent'
     return dict(schema_version=1, tool_version=meta[4], session_id=session_id, config_digest=digest,
-                effective_config=json.loads(meta[2]), effective_mode='cache' if json.loads(meta[2])['mode']=='cache' else 'observe', started_at=utc(meta[0]),
+                effective_config=json.loads(meta[2]), effective_mode=(json.loads(meta[2])['mode'] if 'tuning' in json.loads(meta[2]) else 'cache' if json.loads(meta[2])['mode']=='cache' else 'observe'), started_at=utc(meta[0]),
                 ended_at=utc(meta[1]) if meta[1] else None, shutdown_recorded=meta[1] is not None,
                 generated_at=utc(time()), source_sha256=meta[5], workload='observed proxy traffic; no replay or benchmark',
                 aggregation=dict(bucket_seconds=60, percentiles='exact weighted nearest rank over retained duration frequencies',
                                  boundaries={'proxy':'handling through downstream completion', 'upstream':'active upstream I/O excluding admission and downstream send waits'}),
-                sampling=health, routes=routes)
+                sampling=health, routes=routes, tuning_decisions=decision_history(connection,session_id))
+
+
+def decision_history(connection,session_id):
+    if not connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='decisions'").fetchone():return []
+    rows=connection.execute('SELECT data FROM decisions WHERE session=? ORDER BY sequence', (session_id,))
+    return [json.loads(row[0]) for row in rows]
 
 
 class TelemetryStorage:
@@ -126,13 +134,16 @@ class TelemetryStorage:
         self.stats = dict(enqueued_observations=0, persisted_observations=0, dropped_queue=0, dropped_storage=0,
                           retention_truncated=0, budget_truncated=0, sessions_truncated=0, write_errors=0)
         self.disk_bytes = 0
+        self.decision_sequence=0
+        self.stats.update(persisted_tuning_decisions=0,dropped_tuning_decisions=0,tuning_decisions_truncated=0)
 
     def health(self):
         return dict(persistent=self.state in ('ready', 'closed'), state=self.state, last_error=self.last_error,
                     queue_depth=self.queue.qsize(), queue_capacity=self.queue.maxsize, disk_bytes=self.disk_bytes,
-                    disk_budget_bytes=self.config.metrics.storage_max_bytes, transport=dict(self.transport_counters), **self.stats,
+                    disk_budget_bytes=self.config.metrics.storage_max_bytes,
+                    tuning_history_may_be_incomplete=bool(self.stats['dropped_tuning_decisions'] or self.stats['tuning_decisions_truncated']),transport=dict(self.transport_counters), **self.stats,
                     sampling_incomplete=bool(self.stats['dropped_queue'] or self.stats['dropped_storage'] or
-                                             self.stats['retention_truncated'] or self.stats['budget_truncated']))
+                                             self.stats['retention_truncated'] or self.stats['budget_truncated'] or self.stats['dropped_tuning_decisions']))
 
     def submit(self, stream, row):
         if not self.accepting:
@@ -143,6 +154,16 @@ class TelemetryStorage:
             self.stats['enqueued_observations'] += 1
         except Full:
             self.stats['dropped_queue'] += 1
+
+    def record_decision(self,decision):
+        if not self.accepting:
+            self.stats['dropped_tuning_decisions']+=1
+            return
+        self.decision_sequence+=1
+        try:
+            self.queue.put_nowait(('decision',(self.decision_sequence,self.clock(),dict(decision)),None))
+        except Full:
+            self.stats['dropped_tuning_decisions']+=1
 
     async def start(self):
         ready = Future()
@@ -202,6 +223,8 @@ class TelemetryStorage:
                 duration REAL NOT NULL, n INTEGER NOT NULL,
                 PRIMARY KEY(session,minute,stream,method,route,status,cache,duration)) WITHOUT ROWID;
               CREATE INDEX IF NOT EXISTS samples_age ON samples(minute);
+              CREATE TABLE IF NOT EXISTS decisions(session TEXT NOT NULL,sequence INTEGER NOT NULL,created REAL NOT NULL,
+                data TEXT NOT NULL,PRIMARY KEY(session,sequence)) WITHOUT ROWID;
               PRAGMA user_version=1;
               PRAGMA application_id=1096045902;
             ''')
@@ -222,6 +245,7 @@ class TelemetryStorage:
                     with connection:
                         n = connection.execute('SELECT COALESCE(SUM(n),0) FROM samples WHERE session=?', oldest).fetchone()[0]
                         connection.execute('DELETE FROM samples WHERE session=?', oldest)
+                        connection.execute('DELETE FROM decisions WHERE session=?',oldest)
                         connection.execute('DELETE FROM sessions WHERE id=?', oldest)
                     self.stats['sessions_truncated'] += 1
                     self.stats['budget_truncated'] += n
@@ -254,12 +278,15 @@ class TelemetryStorage:
 
     def _maintain(self, connection):
         self._truncate(connection)
+        cursor=connection.execute('DELETE FROM decisions WHERE created<?',(self.clock()-self.config.metrics.retention_days*86400,))
+        self.stats['tuning_decisions_truncated']+=cursor.rowcount
         stale = connection.execute('SELECT id FROM sessions WHERE started<? AND id!=?',
                                    (self.clock()-self.config.metrics.retention_days*86400, self.session_id)).fetchall()
         overflow = connection.execute('SELECT id FROM sessions WHERE id!=? ORDER BY started DESC,id DESC LIMIT -1 OFFSET ?',
                                       (self.session_id, MAX_SESSIONS-1)).fetchall()
         for (session,) in set(stale+overflow):
             connection.execute('DELETE FROM samples WHERE session=?', (session,))
+            connection.execute('DELETE FROM decisions WHERE session=?',(session,))
             connection.execute('DELETE FROM sessions WHERE id=?', (session,))
             self.stats['sessions_truncated'] += 1
 
@@ -281,6 +308,7 @@ class TelemetryStorage:
                     oldest = connection.execute('SELECT id FROM sessions WHERE id!=? ORDER BY started,id LIMIT 1', (self.session_id,)).fetchone()
                     if oldest is None:
                         raise
+                    connection.execute('DELETE FROM decisions WHERE session=?',oldest)
                     connection.execute('DELETE FROM sessions WHERE id=?', oldest)
                     self.stats['sessions_truncated'] += 1
         raise StorageUnavailable('Unable to checkpoint within storage budget')
@@ -342,7 +370,19 @@ class TelemetryStorage:
                     self.state = 'closed'
                     self._checkpoint(connection, self.clock())
                     break
-                if kind == 'event':
+                if kind == 'decision':
+                    sequence,created,decision=data
+                    with connection:
+                        self._maintain(connection)
+                        removed=connection.execute('DELETE FROM decisions WHERE session=? AND sequence NOT IN (SELECT sequence FROM decisions WHERE session=? ORDER BY sequence DESC LIMIT ?)',
+                                           (self.session_id,self.session_id,max(0,self.config.tuning.history_capacity-1)))
+                        trimmed=removed.rowcount
+                        connection.execute('INSERT INTO decisions VALUES(?,?,?,?)',(self.session_id,sequence,created,json.dumps(decision)))
+                    self.stats['tuning_decisions_truncated']+=trimmed
+                    self.stats['persisted_tuning_decisions']+=1
+                    self.state,self.last_error='ready',None
+                    written=True
+                elif kind == 'event':
                     batch = [data]
                     while len(batch) < 64:
                         try:
@@ -363,12 +403,20 @@ class TelemetryStorage:
                     if not future.cancelled():
                         future.set_result(value)
             except StorageUnavailable:
-                future.set_exception(StorageUnavailable('Session not found for this configuration'))
+                if future is not None:future.set_exception(StorageUnavailable('Session not found for this configuration'))
+                else:
+                    self.state,self.last_error='degraded','storage_write_failed'
+                    self.stats['write_errors']+=1
+                    if kind=='decision' and not written:self.stats['dropped_tuning_decisions']+=1
+                    if kind=='event' and not written:self.stats['dropped_storage']+=len(batch)
+                    if kind=='close':break
             except (OSError, sqlite3.Error, ValueError):
                 self.state, self.last_error = 'degraded', 'storage_write_or_read_failed'
                 self.stats['write_errors'] += 1
                 if kind == 'event' and not written:
                     self.stats['dropped_storage'] += len(batch)
+                if kind == 'decision' and not written:
+                    self.stats['dropped_tuning_decisions']+=1
                 if future is not None and not future.cancelled():
                     future.set_exception(StorageUnavailable('Telemetry storage unavailable'))
                 if kind == 'close':

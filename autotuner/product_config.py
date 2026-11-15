@@ -71,6 +71,8 @@ class RoutePolicy(Contract):
 
     @model_validator(mode='after')
     def bounds(self):
+        if self.ttl_max_seconds > 10**308:
+            raise ValueError('TTL exceeds the supported numeric range')
         if self.ttl_min_seconds > self.ttl_max_seconds:
             raise ValueError('TTL minimum cannot exceed maximum')
         if len(set(self.vary_headers)) != len(self.vary_headers):
@@ -97,15 +99,34 @@ class CacheRules(Contract):
         return self
 
 
+class TuningConfig(Contract):
+    sample_capacity: Annotated[int, Field(strict=True, ge=2, le=100)] = 20
+    minimum_samples: Annotated[int, Field(strict=True, ge=1, le=100)] = 4
+    reuse_minimum: Annotated[int, Field(strict=True, ge=2, le=100)] = 2
+    enable_ms: Annotated[float, Field(strict=True, gt=0, le=60000, allow_inf_nan=False)] = 2.0
+    retain_ms: Annotated[float, Field(strict=True, gt=0, le=60000, allow_inf_nan=False)] = 1.5
+    cooldown_seconds: Annotated[float, Field(strict=True, ge=0, le=3600, allow_inf_nan=False)] = 5.0
+    reuse_window_seconds: Annotated[float, Field(strict=True, gt=0, le=3600, allow_inf_nan=False)] = 60.0
+    learning_window_seconds: Annotated[float, Field(strict=True, gt=0, le=86400, allow_inf_nan=False)] = 300.0
+    history_capacity: Annotated[int, Field(strict=True, ge=1, le=1000)] = 100
+
+    @model_validator(mode='after')
+    def bounds(self):
+        if self.minimum_samples>self.sample_capacity or self.reuse_minimum>self.sample_capacity or self.retain_ms>self.enable_ms:
+            raise ValueError('Invalid learning capacity or hysteresis thresholds')
+        return self
+
+
 class ProductConfig(Contract):
     schema_version: Literal[1] = 1
     upstream: str
     listen: str = '127.0.0.1:8080'
-    mode: Literal['observe', 'recommend', 'cache', 'adaptive'] = 'observe'
+    mode: Literal['observe', 'recommend', 'cache', 'adaptive', 'off'] = 'observe'
     operations: list[Operation] = Field(default_factory=list, max_length=1000)
     limits: Limits = Field(default_factory=Limits)
     cache: CacheRules = Field(default_factory=CacheRules)
     metrics: MetricsConfig = Field(default_factory=MetricsConfig)
+    tuning: TuningConfig = Field(default_factory=TuningConfig)
 
     @model_validator(mode='after')
     def operation_labels(self):

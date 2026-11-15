@@ -166,7 +166,7 @@ def test_request_bypasses_never_use_or_replace_public_entries(config,headers,rea
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize('mode,policy,reason',[(mode,'cache','mode_observe') for mode in ('observe','recommend','adaptive')]+[('cache','observe','rule_observe'),('cache','adaptive','rule_observe')])
+@pytest.mark.parametrize('mode,policy,reason',[('observe','cache','mode_observe'),('off','cache','mode_off'),('recommend','cache','recommend_only')]+[('cache','observe','rule_observe'),('cache','adaptive','rule_observe')])
 def test_both_global_and_route_opt_in_are_required(config,mode,policy,reason):
     config.mode=mode;config.cache.routes[0].policy=policy
     calls=[]
@@ -373,7 +373,7 @@ def test_cache_controls_and_cli(config,tmp_path,monkeypatch,capsys):
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://proxy') as c:
             result=(await c.get('/_autotuner/cache/explain?path=/items/1')).json()
             assert result['rule']['id']=='items' and result['last_decision']['reason']=='stored'
-            assert (await c.get('/_autotuner/status')).json()['phase']==7
+            assert (await c.get('/_autotuner/status')).json()['phase']==8
             assert (await c.get('/_autotuner/cache/explain?path=bad')).status_code==400
             assert (await c.get('/_autotuner/cache/clear')).status_code==404
             assert (await c.post('/_autotuner/cache/clear')).json()['cache']['entries']==0

@@ -1,4 +1,4 @@
-"""Phase 7 proxy session and loopback control endpoints."""
+"""Phase 8 proxy session and loopback control endpoints."""
 import uuid
 from urllib.parse import parse_qs
 
@@ -15,6 +15,7 @@ class ControlSession:
         self.running = False
         self.proxy = ObservationProxy(config, self.session_id, transport=transport)
         self.storage = TelemetryStorage(config, self.session_id, transport_counters=self.proxy.counters)
+        self.proxy.cache.controller.listener=self.storage.record_decision
         self.proxy.metrics.observer = lambda row: self.observe("proxy", row)
         self.proxy.upstream_metrics.observer = lambda row: self.observe("upstream", row)
 
@@ -27,10 +28,10 @@ class ControlSession:
         self.storage.submit(boundary, row)
 
     def status(self):
-        return dict(schema_version=1, session_id=self.session_id, phase=7,
+        return dict(schema_version=1, session_id=self.session_id, phase=8,
                     mode=self.config.mode, effective_mode=effective_mode(self.config), running=self.running,
                     upstream=self.config.upstream, listen=self.config.listen,
-                    forwarding_enabled=True, cache_serving_enabled=effective_mode(self.config)=="cache" and any(r.policy=="cache" for r in self.config.cache.routes),
+                    forwarding_enabled=True, cache_serving_enabled=any(self.proxy.cache.serving(r) for r in self.config.cache.routes),
                     storage=self.storage.health(),
                     limits=self.config.limits.model_dump(), transport=dict(self.proxy.counters),cache=self.proxy.cache.status())
 
@@ -89,7 +90,12 @@ class ControlSession:
                     if path.endswith('/insights'):
                         result = analyze(self.config, self.proxy.metrics, self.proxy.upstream_metrics,
                                          transport=self.proxy.counters, storage=self.storage.health(), window=window)
-                        result.update(session_id=self.session_id, config_digest=self.storage.digest, phase=7)
+                        result.update(session_id=self.session_id, config_digest=self.storage.digest, phase=8,cache=self.proxy.cache.status())
+                        for item in result['cache_suitability']:
+                            policy=self.proxy.cache.rule(item['operation'].split(' ',1)[1])
+                            if policy is not None:
+                                item['response_cache_serving_enabled']=self.proxy.cache.serving(policy)
+                                if policy.policy=='adaptive':item['tuning']=self.proxy.cache.controller.evaluate(policy)
                         return await json_response(send, 200, result)
                     result = self.proxy.metrics.snapshot(window)
                     result.update(schema_version=1, session_id=self.session_id,

@@ -227,7 +227,7 @@ def test_proxy_storage_integration_redaction_bounds_and_controls(config):
                 assert all(r['count']==8 for r in result['routes'])
                 assert result['sampling']['transport']['completed_requests']==8
                 status=(await client.get('/_autotuner/status')).json()
-                assert status['phase']==7 and status['storage']['persistent']
+                assert status['phase']==8 and status['storage']['persistent']
                 assert not status['cache_serving_enabled']
                 assert (await client.get('/_autotuner/sessions')).json()['sessions'][0]['session_id']==app.session_id
                 assert (await client.get('/_autotuner/report?session=unknown')).status_code==503
