@@ -1,4 +1,4 @@
-"""Phase 10 proxy session and loopback control endpoints."""
+"""Phase 11 proxy session and loopback control endpoints."""
 import asyncio
 from time import perf_counter
 import uuid
@@ -35,7 +35,7 @@ class ControlSession:
     def status(self):
         try:active_tasks=len(asyncio.all_tasks())
         except RuntimeError:active_tasks=None
-        return dict(schema_version=1, session_id=self.session_id, phase=10,
+        return dict(schema_version=1, session_id=self.session_id, phase=11,
                     uptime_seconds=max(0,perf_counter()-self.started_monotonic),
                     runtime=dict(in_flight=self.proxy.in_flight,hot_reads=self.proxy.hot_reads,active_tasks=active_tasks),
                     mode=self.config.mode, effective_mode=effective_mode(self.config), running=self.running,
@@ -102,7 +102,7 @@ class ControlSession:
                     if path.endswith('/insights'):
                         result = analyze(self.config, self.proxy.metrics, self.proxy.upstream_metrics,
                                          transport=self.proxy.counters, storage=self.storage.health(), window=window)
-                        result.update(session_id=self.session_id, config_digest=self.storage.digest, phase=10,cache=self.proxy.cache.status())
+                        result.update(session_id=self.session_id, config_digest=self.storage.digest, phase=11,cache=self.proxy.cache.status())
                         for item in result['cache_suitability']:
                             policy=self.proxy.cache.rule(item['operation'].split(' ',1)[1])
                             if policy is not None:

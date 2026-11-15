@@ -25,6 +25,7 @@ from typing import Annotated,Literal
 from .core.metrics import percentile
 from .product_config import Contract,ProductConfig
 from .qualification_fixture import seed,reference,encode,PAYLOAD_BYTES
+from ._version import __version__
 
 
 MODES=('direct','observe','off','adaptive')
@@ -61,7 +62,7 @@ def source_hashes():
 
 def environment():
     result=dict(python=platform.python_version(),os=platform.platform(),machine=platform.machine(),
-                logical_cpus=os.cpu_count(),processor=platform.processor(),tool_version=version('api-performance-auto-tuner'),
+                logical_cpus=os.cpu_count(),processor=platform.processor(),tool_version=__version__,
                 dependencies={name:version(name) for name in ('httpx','uvicorn','pydantic')},physical_cpus=None,ram_bytes=None)
     result['clocks']={name:dict(implementation=get_clock_info(name).implementation,resolution_seconds=get_clock_info(name).resolution)
                       for name in ('monotonic','perf_counter')}

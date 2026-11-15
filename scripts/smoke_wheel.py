@@ -10,6 +10,10 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('wheel',type=Path)
     args=parser.parse_args();wheel=args.wheel.resolve(strict=True)
+    if wheel.is_dir():
+        wheels=list(wheel.glob('*.whl'))
+        if len(wheels)!=1:raise ValueError('Expected exactly one wheel in the distribution directory')
+        wheel=wheels[0]
     with tempfile.TemporaryDirectory(prefix='autotuner-clean-install-') as temporary:
         root=Path(temporary);venv.create(root/'venv',with_pip=True)
         python=root/'venv'/('Scripts/python.exe' if __import__('os').name=='nt' else 'bin/python')

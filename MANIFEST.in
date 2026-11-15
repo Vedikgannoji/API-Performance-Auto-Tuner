@@ -1,0 +1,7 @@
+include README.md README_DEMO.md CHANGELOG.md CONTRIBUTING.md SECURITY.md
+recursive-include autotuner *.py *.html *.css *.js *.json
+recursive-include examples *.py *.json
+recursive-include scripts *.py
+recursive-include tests *.py *.cjs
+recursive-include docs/product *.md *.json
+recursive-include docs/release *.json

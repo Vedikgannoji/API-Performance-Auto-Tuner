@@ -21,8 +21,9 @@ from .session import ControlSession
 from .storage import config_identity, connect_readonly, history, report
 from .reporting import serialize_report
 from .scenarios import load_scenario
+from ._version import __version__
 
-VERSION = '2.0.0'
+VERSION = __version__
 
 
 class ControlError(OSError):
@@ -60,6 +61,13 @@ def parser():
     init.add_argument('--force', action='store_true')
     init.add_argument('--upstream', default=None)
     init.add_argument('--json', action='store_true')
+    demo=commands.add_parser('demo',help='Run a disposable RAM-only example upstream; no user database')
+    demo.add_argument('--listen',default='127.0.0.1:3000')
+    release=commands.add_parser('release',help='Inspect local candidate evidence; never publishes')
+    release_commands=release.add_subparsers(dest='release_command',required=True)
+    ready=release_commands.add_parser('check')
+    ready.add_argument('--evidence',required=True)
+    ready.add_argument('--json',action='store_true')
     config = commands.add_parser('config', help='Validate resolved configuration')
     checks = config.add_subparsers(dest='config_command', required=True)
     check = checks.add_parser('check')
@@ -155,6 +163,19 @@ def local_json(config,method,path,payload=None):
 def main(argv=None):
     args = parser().parse_args(argv)
     try:
+        if args.command=='demo':
+            from .demo import DemoAPI
+            import uvicorn
+            config=ProductConfig(upstream='http://127.0.0.1:3000',listen=args.listen)
+            host,port=config.listen.rsplit(':',1)
+            print('Disposable RAM-only upstream: http://'+config.listen+'; Ctrl+C stops and resets it.',file=sys.stderr)
+            uvicorn.run(DemoAPI(),host=host.strip('[]'),port=int(port),access_log=False)
+            return 0
+        if args.command=='release':
+            from .release import assess
+            result=assess(Path(args.evidence))
+            emit(result,args.json)
+            return 0 if result['ready'] else 3
         if args.command == 'init':
             config = ProductConfig(upstream=args.upstream or os.environ.get('AUTOTUNER_UPSTREAM', 'http://127.0.0.1:3000'))
             path = config_path(args)
@@ -306,7 +327,7 @@ def main(argv=None):
                     raise ControlError('Invalid local session response') from exc
             if (not isinstance(data, dict) or data.get('schema_version') != 1 or
                 not isinstance(data.get('session_id'), str) or
-                (args.command == 'status' and data.get('phase') not in (3, 4, 5, 6, 7, 8, 9, 10)) or
+                (args.command == 'status' and data.get('phase') not in (3, 4, 5, 6, 7, 8, 9, 10, 11)) or
                 (args.command == 'endpoints' and not isinstance(data.get('routes'), dict)) or
                 (args.command == 'insights' and (not isinstance(data.get('findings'), list) or not isinstance(data.get('cache_suitability'), list) or data.get('recommendations_applied') is not False))):
                 raise ControlError('Listener did not return a compatible control session')

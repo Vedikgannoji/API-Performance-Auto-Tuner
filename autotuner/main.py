@@ -1,3 +1,4 @@
+from ._version import __version__
 import os
 import sqlite3
 from pathlib import Path
@@ -12,7 +13,7 @@ from .schemas import CacheMode, OrderCreate, OrderStatus, ProductCreate, Product
 
 
 def create_app(db_path=None, cache_config=None):
-    app = FastAPI(title='Self-Optimizing API Performance Monitor', version='2.0.0')
+    app = FastAPI(title='Self-Optimizing API Performance Monitor', version=__version__)
     db = Database(db_path or os.getenv('AUTOTUNER_DB', 'autotuner.sqlite3'))
     engine = PerformanceEngine(cache_config)
     cache, metrics = engine.cache, engine.metrics

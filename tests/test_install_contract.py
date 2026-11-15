@@ -28,3 +28,18 @@ def test_clean_install_missing_wheel_does_not_start_environment(tmp_path,monkeyp
     monkeypatch.setattr(sys,'argv',['smoke_wheel',str(tmp_path/'missing.whl')])
     with pytest.raises(FileNotFoundError):smoke_wheel.main()
     create.assert_not_called()
+
+
+@pytest.mark.parametrize('count', [0, 1, 2])
+def test_clean_install_selects_one_wheel_from_directory(tmp_path, monkeypatch, count):
+    for index in range(count): (tmp_path / f'candidate{index}.whl').write_bytes(b'placeholder')
+    create=Mock();run=Mock()
+    monkeypatch.setattr(smoke_wheel.venv,'create',create)
+    monkeypatch.setattr(smoke_wheel.subprocess,'run',run)
+    monkeypatch.setattr(sys,'argv',['smoke_wheel',str(tmp_path)])
+    if count == 1:
+        smoke_wheel.main()
+        assert run.call_args_list[0].args[0][-1] == str(tmp_path / 'candidate0.whl')
+    else:
+        with pytest.raises(ValueError): smoke_wheel.main()
+        create.assert_not_called()

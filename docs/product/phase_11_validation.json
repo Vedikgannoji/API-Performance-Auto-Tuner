@@ -1,0 +1,95 @@
+{
+  "phase": 11,
+  "status": "release_preparation_review_passed_publication_blocked",
+  "publication_performed": false,
+  "version": "2.0.0b1",
+  "verified_on": "2026-11-15",
+  "baseline_commit": "beedfb7",
+  "tests": {
+    "focused_python": 38,
+    "full_python": 483,
+    "javascript": 19,
+    "failed": 0,
+    "full_command": "python scripts/test_socketless.py --junitxml=tmp/phase11-tests.xml --tb=short",
+    "focused_command": "python scripts/test_socketless.py tests/test_release.py tests/test_install_contract.py tests/test_cli.py -o addopts=\"\" --tb=short",
+    "javascript_command": "node --test tests/workflow.test.cjs tests/product_ui.test.cjs",
+    "core_gate_command": "python -m autotuner.quality coverage.json",
+    "warnings": 3
+  },
+  "coverage": {
+    "covered_lines": 3011,
+    "num_statements": 3053,
+    "percent_covered": 97.60671107821366,
+    "percent_covered_display": "98",
+    "missing_lines": 42,
+    "excluded_lines": 7,
+    "percent_statements_covered": 98.62430396331477,
+    "percent_statements_covered_display": "99",
+    "num_branches": 1000,
+    "num_partial_branches": 43,
+    "covered_branches": 945,
+    "missing_branches": 55,
+    "percent_branches_covered": 94.5,
+    "percent_branches_covered_display": "94"
+  },
+  "core_statement_percent": 100.0,
+  "core_branch_percent": 100.0,
+  "user_review": {
+    "reviewed_on": "2026-11-15",
+    "evidence_files": [
+      "Pasted text(20261115-145946).txt",
+      "Pasted text(20261115-145906).txt"
+    ],
+    "evidence_boundary": "User-supplied terminal logs; the same test run appears in both files. Artifact hashes below belong to the earlier sandbox build, not the user's rebuilt distributions.",
+    "platform": "Windows, Python 3.12.0",
+    "pytest_version": "8.4.2",
+    "full_command": "python -m pytest",
+    "full_python_passed": 483,
+    "full_python_seconds": 45.31,
+    "overall_coverage_percent": 97.61,
+    "core_statements_percent": 100.0,
+    "core_branches_percent": 100.0,
+    "javascript_passed": 19,
+    "javascript_failed": 0,
+    "editable_install": "passed: fresh virtual environment with test, benchmark and release extras",
+    "build_frontend": "passed: python -m build --outdir tmp/phase11-review-dist; wheel and source archive built",
+    "twine_check": "passed: wheel and source archive",
+    "fresh_wheel_install": "passed: scripts/smoke_wheel.py created a disposable venv, installed dependencies, imported from site-packages outside the repository, and completed CLI/config/assets checks",
+    "source_digest": "2a14a78bed91e9533bac15e4b2ff700b7463f72a04aac25248caaa3cc0602986",
+    "release_ready": false,
+    "release_blockers_expected": true,
+    "publication_performed": false
+  },
+  "packaging": {
+    "wheel_build": "passed: setuptools.build_meta.build_wheel",
+    "sdist_build": "passed: setuptools.build_meta.build_sdist",
+    "wheel_rebuilt_from_sdist": "passed; runtime contents match original wheel",
+    "wheel_sha256": "0d0ab93e0c7673c218596ee78b1e1a6bd7db426eeba7cf6638c3024f8db5bdce",
+    "sdist_sha256": "7fd59ace12bb675d5cff82052da9c2168ab91b4c22cc710c346a4d206eb58c7e",
+    "target_install": "passed: --no-deps --no-compile; existing runtime dependencies",
+    "installed_checks": "37 runtime files match workspace and wheel; dashboard, scenario MISS/HIT, RAM demo mutation, ASGI benchmark correctness and blocked release check passed",
+    "fresh_venv_dependencies": "not_run_in_managed_sandbox; workflow and smoke_wheel coordinator supplied",
+    "twine_check": "not_run: optional tool unavailable locally",
+    "build_frontend": "not_run: build frontend unavailable; distributions built directly with setuptools backend"
+  },
+  "release_check": {
+    "schema_version": 1,
+    "version": "2.0.0b1",
+    "source_digest": "2a14a78bed91e9533bac15e4b2ff700b7463f72a04aac25248caaa3cc0602986",
+    "ready": false,
+    "publication_performed": false,
+    "blockers": [
+      "qualification:missing",
+      "soak:missing",
+      "review_receipt:missing"
+    ],
+    "boundary": "Offline local evidence and maintainer attestations; no authenticity or registry ownership verification"
+  },
+  "limitations": [
+    "Socketless event-loop policy; no real TCP qualification performed in sandbox",
+    "Hosted CI and manual artifact workflow not executed",
+    "Current-source reference-host benchmark and full 30-minute soak deferred",
+    "License, package ownership/publisher identity and external pilot acceptance pending",
+    "No registry publication or git commit/push performed"
+  ]
+}

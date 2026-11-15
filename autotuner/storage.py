@@ -12,8 +12,9 @@ from queue import Empty, Full, Queue
 import sqlite3
 from threading import Thread
 from time import time,perf_counter
+from ._version import __version__
 
-TOOL_VERSION = '2.0.0'
+TOOL_VERSION = __version__
 SCHEMA_VERSION = 1
 MAX_SESSIONS = 100
 APPLICATION_ID = 0x4154554E
