@@ -1,5 +1,5 @@
 """Installable observation-proxy command interface."""
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 import argparse
 import json
 import logging
@@ -239,30 +239,36 @@ def main(argv=None):
                 return 0
             if plan.preview()['writes'] and not args.allow_writes:
                 raise ValueError('Use --allow-writes after reviewing scenario preview')
-            print(f"Scenario preview: {plan.preview()['requests']} requests, {plan.preview()['writes']} writes.",file=sys.stderr)
             identifier=str(uuid.uuid4())
-            print('Run ID: '+identifier+' (no automatic retry if the connection is lost).',file=sys.stderr)
-            endpoint='/_autotuner/scenarios/jobs/'+identifier
-            try:
-                report_data=local_json(config,'POST','/_autotuner/scenarios/run',
-                    dict(scenario=plan.model_dump(exclude_unset=True),allow_writes=args.allow_writes,run_id=identifier))
-                while report_data.get('state')=='running':
-                    time.sleep(.25)
-                    report_data=local_json(config,'GET',endpoint)
-            except KeyboardInterrupt:
-                print('Stopping after the current request; completed writes are retained.',file=sys.stderr)
-                report_data=local_json(config,'POST','/_autotuner/scenarios/stop',dict(run_id=identifier))
-                while report_data.get('state')=='running':
-                    time.sleep(.25)
-                    report_data=local_json(config,'GET',endpoint)
-            if report_data.get('run_id')!=identifier or report_data.get('state') not in ('completed','stopped','failed','runtime_limit','interrupted'):
-                raise ControlError('Invalid scenario report')
-            if args.output:
-                with Path(args.output).open('w' if args.force else 'x',encoding='utf-8') as output:
+            with ExitStack() as stack:
+                output = stack.enter_context(Path(args.output).open('w' if args.force else 'x', encoding='utf-8')) if args.output else None
+                if output is not None:
+                    output.write(json.dumps(dict(schema_version=1,run_id=identifier,state='incomplete',note='Execution may have begun; inspect the proxy before retrying.'))+'\n')
+                    output.flush()
+                print(f"Scenario preview: {plan.preview()['requests']} requests, {plan.preview()['writes']} writes.",file=sys.stderr)
+                print('Run ID: '+identifier+' (no automatic retry if the connection is lost).',file=sys.stderr)
+                endpoint='/_autotuner/scenarios/jobs/'+identifier
+                try:
+                    report_data=local_json(config,'POST','/_autotuner/scenarios/run',
+                        dict(scenario=plan.model_dump(exclude_unset=True),allow_writes=args.allow_writes,run_id=identifier))
+                    while report_data.get('state')=='running':
+                        time.sleep(.25)
+                        report_data=local_json(config,'GET',endpoint)
+                except KeyboardInterrupt:
+                    print('Stopping after the current request; completed writes are retained.',file=sys.stderr)
+                    report_data=local_json(config,'POST','/_autotuner/scenarios/stop',dict(run_id=identifier))
+                    while report_data.get('state')=='running':
+                        time.sleep(.25)
+                        report_data=local_json(config,'GET',endpoint)
+                if report_data.get('run_id')!=identifier or report_data.get('state') not in ('completed','stopped','failed','runtime_limit','interrupted'):
+                    raise ControlError('Invalid scenario report')
+                if output is not None:
+                    output.seek(0)
                     output.write(json.dumps(report_data,indent=2)+'\n')
-                print('Scenario report saved.',file=sys.stderr)
-            else:emit(report_data,args.json)
-            return 0 if report_data['state'] in ('completed','stopped') else 3
+                    output.truncate()
+                    print('Scenario report saved.',file=sys.stderr)
+                else:emit(report_data,args.json)
+                return 0 if report_data['state'] in ('completed','stopped') else 3
         elif args.command in ('report', 'sessions'):
             digest, _ = config_identity(config)
             if args.live:

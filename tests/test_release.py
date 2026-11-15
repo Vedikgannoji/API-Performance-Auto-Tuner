@@ -16,6 +16,7 @@ def evidence(tmp_path, monkeypatch):
     manifest = dict(schema_version=1, version=__version__)
     def put(name, data):
         data = dict(tool_version=__version__, source_digest=digest, **data)
+        data.setdefault('schema_version', 1)
         raw = json.dumps(data).encode(); (tmp_path / (name + '.json')).write_bytes(raw)
         manifest[name] = dict(path=name + '.json', sha256=hashlib.sha256(raw).hexdigest())
     put('qualification', dict(schema_version=1, measurement_revision=2,
@@ -83,6 +84,29 @@ def test_pending_manifest_is_offline(tmp_path, monkeypatch, capsys):
     assert cli.main(['release', 'check', '--evidence', str(path), '--json']) == 3
     assert json.loads(capsys.readouterr().out)['ready'] is False
     network.assert_not_called()
+
+
+@pytest.mark.parametrize('content', [
+    '{"schema_version":true}',
+    '{"schema_version":1,"schema_version":2}',
+    '{"schema_version":1,"value":NaN}',
+    '{"schema_version":1,"value":Infinity}',
+    '{"schema_version":1,"value":1e999}',
+    '{"value":' + '[' * 1500 + '0' + ']' * 1500 + '}',
+], ids=['boolean-schema','duplicate','nan','infinity','overflow-float','deep'])
+def test_ambiguous_or_deep_manifest_is_sanitized(tmp_path, content, capsys):
+    path = tmp_path / 'bad.json'; path.write_text(content)
+    assert cli.main(['release', 'check', '--evidence', str(path), '--json']) == 2
+    assert 'Traceback' not in capsys.readouterr().err
+
+
+@pytest.mark.parametrize('duration', [10**400, float('inf'), float('nan'), True, 1799, 3601])
+def test_soak_duration_cannot_crash_or_qualify(evidence, duration):
+    _, put, save = evidence
+    put('soak', dict(evidence_type='real_http_isolated_product_benchmark',
+        options=dict(profile='soak', duration_seconds=duration), graceful_shutdown=True,
+        gates={key: dict(state='passed') for key in ('telemetry_health', 'stability_30_minutes')}))
+    assert release.assess(save())['ready'] is False
 
 
 def test_demo_cli_loopback_only(monkeypatch):

@@ -18,7 +18,24 @@ def read_json(path, limit):
         raw = handle.read(limit + 1)
     if len(raw) > limit:
         raise ValueError('Evidence exceeds size limit')
-    value = json.loads(raw)
+    def unique_object(pairs):
+        result = {}
+        for key, item in pairs:
+            if key in result:
+                raise ValueError('Duplicate evidence field')
+            result[key] = item
+        return result
+    def reject_constant(value):
+        raise ValueError('Non-finite evidence number')
+    def finite_float(value):
+        number = float(value)
+        if not math.isfinite(number):
+            raise ValueError('Non-finite evidence number')
+        return number
+    try:
+        value = json.loads(raw, object_pairs_hook=unique_object, parse_constant=reject_constant, parse_float=finite_float)
+    except RecursionError:
+        raise ValueError('Evidence nesting exceeds parser limits') from None
     if not isinstance(value, dict):
         raise ValueError('Evidence must be an object')
     return value, raw
@@ -27,7 +44,7 @@ def read_json(path, limit):
 def assess(path):
     path = path.resolve(strict=True)
     manifest, _ = read_json(path, 262144)
-    if manifest.get('schema_version') != 1:
+    if type(manifest.get('schema_version')) is not int or manifest['schema_version'] != 1:
         raise ValueError('Unsupported evidence schema')
     digest = hashlib.sha256(json.dumps(source_hashes(), sort_keys=True).encode()).hexdigest()
     blockers = []
@@ -43,6 +60,8 @@ def assess(path):
             if not target.is_relative_to(path.parent):
                 raise ValueError('Evidence outside review directory')
             value, raw = read_json(target, 32 * 1024 * 1024)
+            if type(value.get('schema_version')) is not int or value['schema_version'] != 1:
+                raise ValueError('Unsupported proof schema')
             for key in ('environment', 'options', 'gates'):
                 if key in value and not isinstance(value[key], dict):
                     raise ValueError('Invalid evidence structure')
@@ -62,7 +81,8 @@ def assess(path):
     if qualification is not None:
         if (qualification.get('schema_version') != 1 or qualification.get('evidence_type') != 'real_http_isolated_product_benchmark'
                 or qualification.get('options', {}).get('profile') != 'qualification'
-                or qualification.get('measurement_revision') != 2):
+                or type(qualification.get('measurement_revision')) is not int
+                or qualification['measurement_revision'] != 2):
             blockers.append('qualification:contract')
         for name in QUALIFICATION_GATES:
             expected = 'confirmed' if name == 'reference_environment' else 'passed'
@@ -73,8 +93,8 @@ def assess(path):
         if (soak.get('schema_version') != 1 or soak.get('evidence_type') != 'real_http_isolated_product_benchmark'
                 or soak.get('options', {}).get('profile') != 'soak'
                 or type(soak.get('options', {}).get('duration_seconds')) not in (int, float)
-                or not math.isfinite(soak['options']['duration_seconds'])
-                or soak['options']['duration_seconds'] < 1800 or soak.get('graceful_shutdown') is not True):
+                or not 1800 <= soak['options']['duration_seconds'] <= 3600
+                or soak.get('graceful_shutdown') is not True):
             blockers.append('soak:contract')
         for name in ('telemetry_health', 'stability_30_minutes'):
             if soak.get('gates', {}).get(name, {}).get('state') != 'passed':

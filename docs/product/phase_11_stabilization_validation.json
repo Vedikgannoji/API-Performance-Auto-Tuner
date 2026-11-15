@@ -1,0 +1,90 @@
+{
+  "scope": "post_phase_11_stabilization",
+  "version": "2.0.0b2",
+  "verified_on": "2026-11-15",
+  "baseline_commit": "befa9ea",
+  "status": "checkpoint_review_passed_qualified_publication_blocked",
+  "publication_performed": false,
+  "user_review": {
+    "reviewed_on": "2026-11-15",
+    "evidence_file": "Pasted text(20261115-152630).txt",
+    "boundary": "User-supplied terminal output; original sandbox artifact hashes below do not identify the user's rebuilt distributions.",
+    "full_command": "python -m pytest",
+    "full_passed": 501,
+    "full_seconds": 49.97,
+    "overall_coverage_percent": 97.55,
+    "core_statements_percent": 100.0,
+    "core_branches_percent": 100.0,
+    "javascript_passed": 19,
+    "javascript_failed": 0,
+    "wheel_and_sdist_build": "passed: python -m build --outdir tmp/b2-review-dist",
+    "twine": "passed: wheel and source archive",
+    "clean_wheel_install": "passed: fresh disposable venv and dependency installation, CLI/config and packaged-resource checks; imports from installed site-packages",
+    "version": "2.0.0b2",
+    "source_digest": "cf8d68cd5a9b60164ed0449a08716d97dee7235d7ec94a5ebb1a6e3240f653c1",
+    "ready": false,
+    "release_blockers_expected": true,
+    "publication_performed": false
+  },
+  "fixes": [
+    "Reserve scenario output before submitting workflows; retain incomplete marker with run ID on uncertain execution",
+    "Reject duplicate, non-finite, deeply nested and invalid-schema release JSON; reject out-of-bounds duration without numeric overflow"
+  ],
+  "tests": {
+    "focused_passed": 67,
+    "focused_command": "python scripts/test_socketless.py tests/test_stabilization.py tests/test_release.py tests/test_cli.py tests/test_console.py -o addopts=\"\" --tb=short",
+    "full_passed": 501,
+    "full_command": ".venv/Scripts/python.exe scripts/test_socketless.py --junitxml=tmp/stabilization-tests.xml --tb=short",
+    "full_seconds": 59.73,
+    "javascript_passed": 19,
+    "javascript_command": "node --test tests/workflow.test.cjs tests/product_ui.test.cjs",
+    "failed": 0,
+    "core_gate": "passed: 100% statements and branches"
+  },
+  "coverage": {
+    "covered_lines": 3035,
+    "num_statements": 3078,
+    "percent_covered": 97.55381604696673,
+    "percent_covered_display": "98",
+    "missing_lines": 43,
+    "excluded_lines": 7,
+    "percent_statements_covered": 98.60298895386615,
+    "percent_statements_covered_display": "99",
+    "num_branches": 1010,
+    "num_partial_branches": 45,
+    "covered_branches": 953,
+    "missing_branches": 57,
+    "percent_branches_covered": 94.35643564356435,
+    "percent_branches_covered_display": "94"
+  },
+  "packaging": {
+    "wheel_and_sdist": "passed: setuptools backend builds",
+    "twine": "passed: both distributions using project venv",
+    "target_install": "passed with --no-deps; existing sandbox runtime dependencies",
+    "installed_smoke": "passed: isolated installed imports; 37 runtime files match workspace and wheel; sdist runtime matches; dashboard, scenarios, cache MISS/HIT, demo mutation and ASGI benchmark correctness",
+    "artifacts_sha256": {
+      "api_performance_auto_tuner-2.0.0b2-py3-none-any.whl": "82be27ca96d2a81c779a2d42fc788735d4dd450c49f89aff8c100bb9c7fcb8f0",
+      "api_performance_auto_tuner-2.0.0b2.tar.gz": "2804aaf918a41257ebde1c707b9ceab38872aaf5710ef789178a3124c6b810ff"
+    }
+  },
+  "release_check": {
+    "schema_version": 1,
+    "version": "2.0.0b2",
+    "source_digest": "cf8d68cd5a9b60164ed0449a08716d97dee7235d7ec94a5ebb1a6e3240f653c1",
+    "ready": false,
+    "publication_performed": false,
+    "blockers": [
+      "qualification:missing",
+      "soak:missing",
+      "review_receipt:missing"
+    ],
+    "boundary": "Offline local evidence and maintainer attestations; no authenticity or registry ownership verification"
+  },
+  "boundaries": [
+    "Managed Windows socketless verification; real TCP performance not qualified",
+    "Fresh b2 wheel dependency installation not run; b1 user review verified a clean dependency install",
+    "Hosted CI, current-source full soak, reference-host overhead and pilots remain pending",
+    "License and publisher identity await owner decisions",
+    "No commit, tag, push, GitHub release or registry publication performed; stop for joint review before Phase 12"
+  ]
+}

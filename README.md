@@ -1,8 +1,10 @@
 # API Performance Auto Tuner
 
-Local API observation proxy, dashboard and explicitly approved public-read caching. **2.0.0b1 is an unreleased, unqualified beta candidate.**
+Local API observation proxy, dashboard and explicitly approved public-read caching. **2.0.0b2 is a Phase 11 checkpoint prerelease candidate; full performance qualification and registry publication remain pending.**
 
 Observe latency, throughput, errors and queueing. Opt into fixed or adaptive response caching with route rules and dependent-write invalidation. Inspect policy decisions, execute ordered API scenarios and export bounded persistent telemetry.
+
+This checkpoint preserves the Phase 1–11 feature set. Project API discovery, interactive terminal menus and the guided optimization lifecycle belong to the [Phase 12–17 roadmap](docs/product/POST_PHASE_11_STABILIZATION.md). See the [checkpoint release notes](docs/release/v2.0.0b2.md).
 
 ## Install from source
 
