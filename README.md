@@ -4,7 +4,7 @@ Local API monitoring, performance insights and adaptive response caching. **The 
 
 Observe latency, throughput, errors and queueing. Opt into fixed or adaptive response caching with route rules and dependent-write invalidation. Inspect policy decisions, execute ordered API scenarios and export bounded persistent telemetry.
 
-Configure your upstream API, inspect its performance and enable approved cache policies. The keyboard-operated terminal workspace is available now. Project API discovery, guided optimization and live terminal comparisons are planned. See the [preview release notes](docs/release/v2.0.0b2.md).
+Discover FastAPI route candidates or import OpenAPI operations, then review an observe configuration for your upstream. The terminal workspace provides configuration, session insights and cache controls. Guided optimization and live terminal comparisons are planned. See the [preview release notes](docs/release/v2.0.0b2.md).
 
 ## Install from source
 
@@ -24,7 +24,7 @@ For a built wheel, use `python -m pip install path-to-wheel.whl` in a virtual en
 
 For keyboard-operated configuration, session insights, cache controls and exports, run `autotuner` in a terminal or `autotuner menu --project .`. Select a number or letter and press Enter. Use **b** to go back, **q** to quit and **h** for help. Opening the workspace stays offline and does not scan or modify your project.
 
-The current menu uses an explicitly selected configuration; it does not discover APIs yet. Start the proxy separately for session actions, as shown below. Browser use is optional. See the [terminal guide](docs/TERMINAL_GUIDE.md).
+Choose **Setup and configuration → Discover project API operations** to inspect the selected project. Start the proxy separately for session actions, as shown below. Browser use is optional. See the [terminal guide](docs/TERMINAL_GUIDE.md).
 
 Scripts can use `autotuner menu --json` to list available actions without prompts. Bare `autotuner` prints help when input or output is redirected; explicit interactive entry requires terminal input and output. Use `autotuner --no-input COMMAND ...` to make non-interactive intent explicit.
 

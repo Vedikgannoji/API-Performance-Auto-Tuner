@@ -2,7 +2,7 @@
 
 Open `autotuner` in a terminal from your project directory, or run `autotuner menu --project .`. Select a number or letter and press Enter. Use **b** or **0** to return, **q** to quit and **h** or **?** for help. This interface uses ordinary line input; raw arrow-key navigation and a live monitoring viewport are planned.
 
-Opening the workspace stays offline. It shows the selected project and configuration without scanning project files, starting an application or generating API traffic. Discovery and guided optimization are planned; the current menu runs existing, explicitly configured operations.
+Opening the workspace stays offline. It shows the selected project and configuration without scanning project files, starting an application or generating API traffic. Choose discovery explicitly from Setup to inspect the project.
 
 ## Available actions
 
@@ -18,6 +18,21 @@ Use **p** to select another project or **c** to select its configuration. Relati
 Configuration creation asks for the upstream URL and acknowledgement, uses observe mode and refuses to overwrite. Running the proxy here asks for acknowledgement and occupies this terminal until Ctrl+C stops it. For menu session actions, keep the proxy running in another terminal. Clearing cached responses retains configured rules. Export paths resolve against the selected project and existing files are not overwritten.
 
 ## Windows walkthrough
+
+### Discover and review an observe configuration
+
+From an activated repository environment, run the following for your API project's directory. `discover` prefers `openapi.json` at the project root. Otherwise it inspects literal decorators on top-level FastAPI instances and simple factories that return a locally constructed app. Use `--openapi path/to/schema.json` for another local OpenAPI 3 JSON file, or `--openapi-url http://127.0.0.1:8000/openapi.json` to explicitly read a running local API's description. The URL mode requires a loopback IP and uses a bounded GET with redirects disabled.
+
+```bat
+python -m autotuner discover --project .
+python -m autotuner setup --project . --select 1 --upstream http://127.0.0.1:8000 --output discovered.json --json
+```
+
+Choose an ID from the inventory instead of `1` if appropriate. Repeat `--select` for additional operations and use the same discovery source flags for preview and apply. Review the operation labels, upstream, loopback listener and destination. To create the file, rerun the preview command with `--apply YOUR_REVIEW_TOKEN`, replacing `YOUR_REVIEW_TOKEN` with the printed token. Use a new output filename if the destination already exists. The config starts in observe mode with an empty cache policy list.
+
+Static discovery reports candidates. Router prefixes, more complex factories, mounts and dynamic paths may require the running OpenAPI description or manual configuration. Paths with whole-segment parameters become `*` labels. Unsupported paths and referenced OpenAPI path items are skipped, and ambiguous selections need to be narrowed before writing. Possible entry points are informational. Start your API with its documented command, then run `python -m autotuner serve --config discovered.json` in another terminal. Stop the proxy with Ctrl+C.
+
+### Try the disposable upstream
 
 Install from the checkout first. These commands use Windows Command Prompt and the existing repository location. No browser or frontend server is needed.
 

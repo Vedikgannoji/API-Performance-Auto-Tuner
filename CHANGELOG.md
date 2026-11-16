@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Discover direct FastAPI route candidates and import local or explicitly requested loopback OpenAPI descriptions.
+- Preview selected operations and save a reviewed observe configuration to a new project-root JSON file.
+
 - Add a keyboard-operated terminal workspace for configuration, session insights, cache controls and exports.
 - Keep help, version and menu startup independent of proxy/database imports; interactive entry adds no runtime dependency.
 - Support offline menu descriptions with `autotuner menu --json` and explicit non-interactive operation with `--no-input`.

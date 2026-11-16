@@ -59,6 +59,21 @@ def parser():
     menu.add_argument('--config',default=None)
     menu.add_argument('--json',action='store_true',help='Describe available menu actions without prompting')
     menu.add_argument('--no-input',action='store_true',default=argparse.SUPPRESS)
+    for name, description in (
+        ('discover', 'List FastAPI route candidates or read an OpenAPI description'),
+        ('setup', 'Preview and save selected operations in an observe configuration'),
+    ):
+        discovery_command = commands.add_parser(name, help=description)
+        discovery_command.add_argument('--project', default='.')
+        source = discovery_command.add_mutually_exclusive_group()
+        source.add_argument('--openapi', help='OpenAPI 3 JSON file inside the project')
+        source.add_argument('--openapi-url', help='Explicit OpenAPI URL on a loopback IP')
+        discovery_command.add_argument('--json', action='store_true')
+    discovery_command.add_argument('--select', type=int, action='append', required=True, metavar='ID')
+    discovery_command.add_argument('--upstream', required=True)
+    discovery_command.add_argument('--listen', default='127.0.0.1:8080')
+    discovery_command.add_argument('--output', default='autotuner.json')
+    discovery_command.add_argument('--apply', metavar='REVIEW_TOKEN', help='Save the exact preview to a new file')
     init = commands.add_parser('init', help='Create an observe-mode JSON configuration')
     init.add_argument('--config', default=None)
     init.add_argument('--force', action='store_true')
@@ -202,6 +217,53 @@ def main(argv=None):
     from .reporting import serialize_report
     from .scenarios import load_scenario
     try:
+        if args.command in ('discover', 'setup'):
+            from .discovery import configuration_path, discover, reviewed_configuration, review_token, write_configuration
+
+            try:
+                inventory = discover(args.project, openapi=args.openapi, openapi_url=args.openapi_url)
+                if args.command == 'discover':
+                    if args.json:
+                        emit(inventory, True)
+                    else:
+                        print(f"{inventory['source']} | {len(inventory['operations'])} supported operations")
+                        for entrypoint in inventory['entrypoint_candidates']:
+                            print('Possible entry point ' + ascii(entrypoint))
+                        for factory in inventory['factory_entrypoint_candidates']:
+                            print('Possible app factory ' + ascii(factory))
+                        for row in inventory['operations']:
+                            print(f"{row['id']}. {row['method']} {row['path']} [{row['confidence']}, {ascii(row['origin'])}]")
+                        for warning in inventory['warnings']:
+                            print(warning)
+                    return 0
+                config = reviewed_configuration(inventory, args.select, args.upstream, args.listen)
+                output = configuration_path(inventory['project'], args.output)
+                selected = [row for row in inventory['operations'] if row['id'] in args.select]
+                token = review_token(config, inventory['project'], args.output, selected)
+                result = dict(schema_version=1, config=config.model_dump(), review_token=token,
+                              selected=selected, output=str(output), written=False)
+                if args.apply is not None:
+                    if args.apply != token:
+                        raise ValueError('Preview changed. Run setup without --apply and review it again')
+                    write_configuration(inventory['project'], args.output, config)
+                    result['written'] = True
+                emit(result, args.json)
+                if result['written'] and not args.json:
+                    print('Start your API separately, then run autotuner serve --config with the saved file.')
+                return 0
+            except FileExistsError:
+                print('Configuration already exists. Choose a new --output filename.', file=sys.stderr)
+                return 2
+            except ValidationError:
+                print('Invalid upstream, listener or ambiguous operation labels. Review the selections.', file=sys.stderr)
+                return 2
+            except ValueError as exc:
+                # Discovery errors can include filesystem names or URL parser input.
+                print('Discovery or setup rejected the input. ' + ascii(str(exc)), file=sys.stderr)
+                return 2
+            except OSError:
+                print('Could not read the project or OpenAPI source, or save the configuration.', file=sys.stderr)
+                return 1
         if args.command=='demo':
             from .demo import DemoAPI
             import uvicorn

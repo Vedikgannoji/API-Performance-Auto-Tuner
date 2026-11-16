@@ -8,7 +8,7 @@ import sys
 from ._version import __version__
 
 MAX_INPUT=4096
-PLANNED=('Automatic API discovery','Guided baseline and optimization sessions',
+PLANNED=('Guided baseline and optimization sessions',
          'Live terminal monitoring and matched comparisons')
 
 
@@ -32,6 +32,7 @@ GROUPS={
         Action('3','Run proxy in this terminal',('serve',),'listen','serve'),
         Action('4','Offline diagnostics',('doctor',),'read_local'),
         Action('5','Check upstream TCP connectivity',('doctor','--connect'),'connect_upstream'),
+        Action('6','Discover project API operations',('discover',),'read_local','discover'),
     )),
     '2':('Session and insights',(
         Action('1','Current session status',('status',),'query_proxy'),
@@ -97,6 +98,13 @@ class Workspace:
         self.say('Planned: '+ '; '.join(PLANNED)+'.')
 
     def execute(self,action):
+        if action.prompt == 'discover':
+            code = self.invoke(['--no-input', 'discover', '--project', str(self.project)])
+            if code == 0:
+                self.say('To preview an observe config for these operations, run autotuner setup --help.')
+            else:
+                self.say(f'Action did not complete (exit {code}). Check the diagnostic above.')
+            return
         args=[*action.command,'--config',str(self.config)]
         if action.prompt=='create':
             upstream=self.ask('Upstream URL [http://127.0.0.1:3000] (b cancels): ')

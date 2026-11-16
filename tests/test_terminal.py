@@ -59,7 +59,7 @@ def test_json_manifest_does_not_scan_read_config_or_connect(tmp_path,monkeypatch
     assert cli.main(['--no-input','menu','--project',str(tmp_path),'--json'])==0
     data=json.loads(capsys.readouterr().out)
     assert data['schema_version']==1 and data['read_only_on_entry'] is True and data['interactive'] is False
-    assert len(data['groups'])==4 and len(data['planned_features'])==3
+    assert len(data['groups'])==4 and len(data['planned_features'])==2
     assert 'phase' not in data
 
 
