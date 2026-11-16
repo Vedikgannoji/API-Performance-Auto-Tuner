@@ -38,6 +38,7 @@ GROUPS={
         Action('1','Current session status',('status',),'query_proxy'),
         Action('2','Endpoint metrics',('endpoints',),'query_proxy'),
         Action('3','Performance insights',('insights',),'query_proxy'),
+        Action('4','Save passive baseline',('baseline',),'query_proxy_and_export','export'),
     )),
     '3':('Cache and policies',(
         Action('1','Explain a route policy',('cache','explain'),'query_proxy','route'),

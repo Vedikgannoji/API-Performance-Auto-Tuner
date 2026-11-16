@@ -19,6 +19,7 @@ class RunInput(Contract):
     scenario: Scenario
     allow_writes: StrictBool=False
     run_id: str|None=None
+    expected_session_id: str | None = None
 
 
 ASSETS={'/_autotuner/dashboard':('product_dashboard.html','text/html; charset=utf-8'),
@@ -116,6 +117,9 @@ class Console:
                     await json_response(send,200,result)
                 else:
                     data=RunInput.model_validate(payload)
+                    if data.expected_session_id is not None and data.expected_session_id != self.proxy.session_id:
+                        await json_response(send,409,{'detail':'Proxy session changed. Review the workload again.'})
+                        return True
                     if path.endswith('/preview'):await json_response(send,200,data.scenario.preview())
                     else:await json_response(send,202,self.runner.start(data.scenario,allow_writes=data.allow_writes,identifier=data.run_id))
             finally:self.body_readers-=1

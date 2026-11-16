@@ -67,6 +67,7 @@ def test_json_manifest_does_not_scan_read_config_or_connect(tmp_path,monkeypatch
     ('1','1','', ['config','check']),('1','2','\nyes\n',['init']),
     ('1','3','yes\n',['serve']),('1','4','',['doctor']),('1','5','',['doctor','--connect']),
     ('2','1','',['status']),('2','2','',['endpoints']),('2','3','',['insights']),
+    ('2','4','baseline.json\n',['baseline']),
     ('3','1','/api/products\n',['cache','explain']),('3','2','yes\n',['cache','clear']),
     ('4','1','',['sessions']),('4','2','',['report','--format','json']),
     ('4','3','export.json\n',['report','--format','json']),('4','4','export.json\n',['report','--live','--format','json']),

@@ -100,6 +100,15 @@ def parser():
     endpoints.add_argument('--window', type=int, default=60)
     insights = commands.add_parser('insights', help='Explain recent bottlenecks and caching suitability without applying changes')
     insights.add_argument('--window', type=int, default=300)
+    baseline = commands.add_parser('baseline', help='Save passive observations or preview an explicit GET baseline')
+    baseline.add_argument('--window', type=int, default=300, help='Rolling proxy observation window in seconds')
+    baseline.add_argument('--output', required=True, help='New baseline JSON file')
+    baseline.add_argument('--get', metavar='PATH', help='Concrete test-data path matching a configured GET operation')
+    baseline.add_argument('--environment', choices=('local', 'staging'), help='Attest the active workload target environment')
+    baseline.add_argument('--requests', type=int, default=10)
+    baseline.add_argument('--delay-ms', type=int, default=100)
+    baseline.add_argument('--timeout', type=int, default=3, help='Active per-request timeout in seconds')
+    baseline.add_argument('--apply', metavar='REVIEW_TOKEN', help='Run the exact previewed active workload')
     sessions = commands.add_parser('sessions', help='List retained sessions, including after shutdown')
     report_command = commands.add_parser('report', help='Export retained endpoint telemetry')
     for sub in (sessions, report_command):
@@ -132,7 +141,7 @@ def parser():
     benchmark.add_argument('--format',choices=['json','csv'],default='json')
     benchmark.add_argument('--output',required=True)
     benchmark.add_argument('--force',action='store_true')
-    for sub in (check, serve, doctor, status, endpoints, insights, sessions, report_command, explain, clear, dashboard, preview, run):
+    for sub in (check, serve, doctor, status, endpoints, insights, sessions, report_command, explain, clear, dashboard, preview, run, baseline):
         sub.add_argument('--config', default=None)
         sub.add_argument('--upstream', default=None)
         sub.add_argument('--listen', default=None)
@@ -309,7 +318,25 @@ def main(argv=None):
             print('Benchmark report: '+str(output)+'; qualification requires review of all gates.',file=sys.stderr)
             return exit_code(data,args.require_gates)
         config = resolved_config(args)
-        if args.command == 'config':
+        if args.command == 'baseline':
+            from .baseline import capture
+
+            try:
+                result, code = capture(args, config, lambda *call: local_json(config, *call))
+            except FileExistsError:
+                print('Baseline output already exists. Choose a new filename.', file=sys.stderr)
+                return 2
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                return 2
+            except KeyboardInterrupt:
+                print('Baseline capture interrupted. Inspect the output and any running scenario.', file=sys.stderr)
+                return 130
+            emit(result, args.json)
+            if not result['written'] and not args.json:
+                print('To run this GET workload, repeat the command with --apply followed by the review token.')
+            return code
+        elif args.command == 'config':
             emit({'schema_version': 1, 'valid': True, 'config': config.model_dump()}, args.json)
         elif args.command == 'doctor':
             result = {'schema_version': 1, 'config_valid': True, 'python': sys.version.split()[0],

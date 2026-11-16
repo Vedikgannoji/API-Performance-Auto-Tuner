@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Save passive proxy baselines or preview and approve a bounded GET workload. Baseline JSON separates workload timings from rolling metrics and advisory findings.
+
 - Discover direct FastAPI route candidates and import local or explicitly requested loopback OpenAPI descriptions.
 - Preview selected operations and save a reviewed observe configuration to a new project-root JSON file.
 

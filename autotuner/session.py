@@ -36,7 +36,7 @@ class ControlSession:
     def status(self):
         try:active_tasks=len(asyncio.all_tasks())
         except RuntimeError:active_tasks=None
-        return dict(schema_version=1, session_id=self.session_id, tool_version=__version__,
+        return dict(schema_version=1, session_id=self.session_id, tool_version=__version__, config_digest=self.storage.digest,
                     capabilities=['proxy','dashboard','scenarios','insights','cache','reports'],
                     uptime_seconds=max(0,perf_counter()-self.started_monotonic),
                     runtime=dict(in_flight=self.proxy.in_flight,hot_reads=self.proxy.hot_reads,active_tasks=active_tasks),

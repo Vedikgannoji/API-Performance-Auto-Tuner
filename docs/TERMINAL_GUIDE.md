@@ -75,6 +75,14 @@ Choose **2**, then **1**, **2** or **3** to inspect status, endpoint metrics or 
 
 Linux/macOS use `source .venv/bin/activate` and `curl` instead of the Windows activation path and curl.exe. Change to your checkout/project path in each terminal.
 
+## Capture performance baselines
+
+Choose **Session and insights → Save passive baseline** or run `autotuner baseline --config YOUR_CONFIG --window 300 --output baseline.json`. The running proxy supplies rolling latency, throughput, errors, upstream measurements, cache suitability, resource counters and advisory findings. The baseline file includes the session and configuration identity, tool versions and client source hash. Read the saved JSON for the evidence and each finding's recommended next step.
+
+For a controlled read, add `--get /api/products --environment local --requests 10` and use a new output filename. Use a concrete path with test data and verify that repeating the GET is appropriate for your API. The preview shows the chosen upstream and workload limits. Repeat with `--apply` and the printed review token to start. The workload runs sequentially in observe or off mode and expects HTTP 200. It stops on the first failed request. Ctrl+C requests a stop after the current request. Existing baseline files are preserved.
+
+Saved scenario timings describe the proxy-side workload. Rolling observations may include concurrent traffic and are sampled separately. Check the sample counts and incomplete evidence markers before comparing results. The resource section reports runtime task and request counters, cache accounting and storage state.
+
 ## Scripts and interruption
 
 `autotuner menu --json` prints available actions and effects without prompting. `autotuner --no-input status --config menu-review.local.json --json` uses an existing scripted command. Place global --no-input before a command; it may also follow menu.
