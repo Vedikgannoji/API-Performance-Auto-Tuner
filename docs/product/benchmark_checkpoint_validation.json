@@ -1,7 +1,7 @@
 {
   "scope": "benchmark_checkpoint_settlement",
   "verified_on": "2026-11-15",
-  "status": "local_fix_verified_hosted_recheck_pending",
+  "status": "hosted_checkpoint_fix_confirmed",
   "baseline_commit": "f538a589f51a9195dce5a2aa3816d3832f6e2ddd",
   "evidence": {
     "file": "soak-smoke.json",
@@ -65,5 +65,15 @@
     "Real macOS and other hosted checks require rerun after push",
     "A two-second soak remains insufficient for 30-minute stability qualification",
     "No commit, push, tag or published-asset modification performed"
-  ]
+  ],
+  "hosted_review": {
+    "verified_on": "2026-11-15",
+    "commit": "89cb5b247392f6243373cc866fa0bdb6fade377c",
+    "run_id": 43735945746,
+    "url": "https://github.com/Vedikgannoji/API-Performance-Auto-Tuner/actions/runs/43735945746",
+    "jobs_passed": 9,
+    "jobs_failed": 0,
+    "coverage": "Windows/Linux/macOS with Python 3.11/3.12/3.13; tests, packaging, clean wheel installation, quick benchmark and two-second soak smoke passed",
+    "qualification_boundary": "Compatibility/smoke verification only; not reference-host or 30-minute stability qualification"
+  }
 }

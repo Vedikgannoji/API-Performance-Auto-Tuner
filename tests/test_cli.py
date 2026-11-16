@@ -102,7 +102,7 @@ def test_help_version_and_entrypoint(config, monkeypatch, capsys):
         with pytest.raises(SystemExit) as exc:
             cli.main(args)
         assert exc.value.code == 0
-    assert '2.0.0' in capsys.readouterr().out
+    assert 'autotuner '+cli.VERSION in capsys.readouterr().out
     monkeypatch.setattr(sys, 'argv', ['autotuner', 'doctor'])
     with pytest.raises(SystemExit) as exc:
         cli.entrypoint()
@@ -115,7 +115,7 @@ def test_module_entrypoint_and_redirect_policy(monkeypatch, capsys):
     with pytest.raises(SystemExit) as exc:
         runpy.run_module('autotuner', run_name='__main__')
     assert exc.value.code == 0
-    assert '2.0.0' in capsys.readouterr().out
+    assert 'autotuner '+cli.VERSION in capsys.readouterr().out
     assert cli.NoRedirect().redirect_request(None, None, 302, '', {}, 'http://example.com') is None
 
 

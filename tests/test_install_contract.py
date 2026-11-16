@@ -15,12 +15,13 @@ def test_clean_install_coordinator_uses_own_venv_and_isolated_imports(tmp_path,m
     monkeypatch.setattr(sys,'argv',['smoke_wheel',str(wheel)])
     smoke_wheel.main()
     assert create.call_count==1 and create.call_args.kwargs['with_pip']
-    assert run.call_count==6
+    assert run.call_count==7
     for call in run.call_args_list:
         assert call.kwargs['check'] is True and call.kwargs['timeout']==180
         assert Path(call.args[0][0]).is_relative_to(call.kwargs['cwd'])
     assert run.call_args_list[0].args[0][1:]==['-m','pip','install',str(wheel)]
     assert all(call.args[0][1]=='-I' for call in run.call_args_list[1:])
+    assert run.call_args_list[2].args[0][1:5]==['-I','-m','autotuner','menu']
 
 
 def test_clean_install_missing_wheel_does_not_start_environment(tmp_path,monkeypatch):

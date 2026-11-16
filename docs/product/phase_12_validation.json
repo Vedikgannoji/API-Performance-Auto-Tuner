@@ -1,0 +1,185 @@
+{
+  "phase": 12,
+  "status": "ready_for_joint_review",
+  "version": "2.1.0.dev0",
+  "verified_on": "2026-11-15",
+  "baseline_commit": "89cb5b247392f6243373cc866fa0bdb6fade377c",
+  "deliverables": [
+    "Terminal-first normative Markdown PRD and inherited correctness contracts",
+    "Offline keyboard workspace and machine-readable action descriptions",
+    "Explicit project/config selection and existing command dispatch with confirmations",
+    "Lazy runtime imports for lightweight entrypoints",
+    "Development version, public guide and installed-wheel menu check"
+  ],
+  "tests": {
+    "focused_passed": 87,
+    "focused_command": ".venv/Scripts/python.exe scripts/test_socketless.py tests/test_terminal.py tests/test_cli.py tests/test_install_contract.py tests/test_public_metadata.py -o addopts=\"\" --tb=short",
+    "full_passed": 579,
+    "full_command": ".venv/Scripts/python.exe scripts/test_socketless.py --junitxml=tmp/phase12-tests.xml --tb=short",
+    "full_seconds": 181.71,
+    "javascript_passed": 19,
+    "javascript_command": "node --test tests/workflow.test.cjs tests/product_ui.test.cjs",
+    "failed": 0,
+    "core_statements_percent": 100,
+    "core_branches_percent": 100
+  },
+  "coverage": {
+    "covered_lines": 3201,
+    "num_statements": 3244,
+    "percent_covered": 97.6674364896074,
+    "percent_covered_display": "98",
+    "missing_lines": 43,
+    "excluded_lines": 7,
+    "percent_statements_covered": 98.67447595561036,
+    "percent_statements_covered_display": "99",
+    "num_branches": 1086,
+    "num_partial_branches": 46,
+    "covered_branches": 1028,
+    "missing_branches": 58,
+    "percent_branches_covered": 94.65930018416206,
+    "percent_branches_covered_display": "95"
+  },
+  "manual_terminal": {
+    "status": "passed",
+    "command": ".venv/Scripts/python.exe -m autotuner menu --project .",
+    "actions": [
+      "h: help",
+      "1: setup submenu",
+      "b: back",
+      "q: clean exit"
+    ],
+    "network_or_project_changes": "none"
+  },
+  "packaging": {
+    "wheel_build": "passed: setuptools backend",
+    "sdist_build": "passed: setuptools backend",
+    "twine": "passed: both artifacts",
+    "matched_runtime_files": 38,
+    "installed_smoke": "passed: target install with existing dependencies; installed imports, menu JSON, assets, scenarios, cache and RAM fixture",
+    "fresh_dependency_install": "not_run_locally; smoke_wheel coordinator and hosted CI updated",
+    "frontend_no_isolation": "unavailable in project venv because setuptools backend was not installed; existing host backend used instead",
+    "wheel_sha256": "d943201917e26ebc2ff552266d8a4a4039239f0250864d02681a54ab08ef04d1",
+    "sdist_sha256": "1d28191fc8a6e2b173a927746f7d5622128ddafe6519dde6471870f7f0980076"
+  },
+  "startup_diagnostics": {
+    "initial_before": {
+      "elapsed_ms": [
+        2264.881899987813,
+        655.0595000153407,
+        648.8311000284739
+      ],
+      "median_ms": 655.0595000153407
+    },
+    "initial_after_concurrent_test_build_load": {
+      "--version": {
+        "elapsed_ms": [
+          1037.3377000214532,
+          1263.003200001549,
+          1006.9608999765478,
+          1037.3609999660403,
+          1244.930499990005
+        ],
+        "median_ms": 1037.3609999660403,
+        "maximum_ms": 1263.003200001549
+      },
+      "--help": {
+        "elapsed_ms": [
+          1229.0641000145115,
+          1010.2850999683142,
+          885.9577999683097,
+          746.4349999791011,
+          911.4194000139832
+        ],
+        "median_ms": 911.4194000139832,
+        "maximum_ms": 1229.0641000145115
+      },
+      "menu --json": {
+        "elapsed_ms": [
+          960.4734000167809,
+          727.9123999760486,
+          822.0795000088401,
+          970.7821999909356,
+          742.1112000010908
+        ],
+        "median_ms": 822.0795000088401,
+        "maximum_ms": 970.7821999909356
+      }
+    },
+    "alternating_source_adapter": {
+      "protocol": "five alternating fresh processes; same source-loader adapter; no other task-owned test/build processes active; local diagnostic, not reference-host qualification",
+      "trials_ms": {
+        "committed": [
+          1354.9787999945693,
+          1164.7369000129402,
+          1063.7085000053048,
+          1142.364599974826,
+          1164.4778999616392
+        ],
+        "current": [
+          510.5780000449158,
+          541.3122000172734,
+          357.46630001813173,
+          603.8615999859758,
+          540.7662999932654
+        ]
+      },
+      "median_ms": {
+        "committed": 1164.4778999616392,
+        "current": 540.7662999932654
+      }
+    },
+    "qualified": false,
+    "note": "All trials retained. Local process/loader diagnostics only; hardware/load and methods differ from release protocol. Proposed reference-host startup budgets are not claimed as met."
+  },
+  "decisions": {
+    "current_contract": "docs/reference/Autotuner_CLI_Product_PRD.md",
+    "historical_word": "docs/reference/Autotuner_Technical_PRD.docx retained, not regenerated",
+    "license_and_registry": "assigned to owner; pending before publication",
+    "terminal": "standard-library line input; numbers/letters plus Enter; no new runtime dependency"
+  },
+  "limitations": [
+    "Socketless local Python 3.12 tests do not establish real TCP or new cross-platform qualification",
+    "Phase 13 discovery and later guided analysis/tuning/live comparisons are not implemented",
+    "Current menu uses an explicitly selected config and an existing proxy for session actions",
+    "Startup/CPU budgets remain proposals for review and later qualification",
+    "No publication, tag rewrite, commit/push or automatic Phase 13 start"
+  ],
+  "followup_terminal_review": {
+    "verified_on": "2026-11-16",
+    "status": "passed",
+    "actions": [
+      "decline configuration creation",
+      "confirm creation in an isolated project",
+      "validate generated observe configuration",
+      "reject a second creation with exit 2",
+      "quit with exit 0"
+    ],
+    "boundary": "Interactive local configuration walkthrough. No upstream or proxy was started. User review remains pending."
+  },
+  "missing_configuration_review": {
+    "finding": "Validate, serve, and cache clear reported a generic path error when the selected configuration was absent.",
+    "correction": "Identify the missing config and explain how to create or select one. Preserve exit 2.",
+    "focused_command": "python scripts/test_socketless.py tests/test_terminal.py tests/test_cli.py -o addopts=\"\" --tb=short",
+    "focused_passed": 70,
+    "full_command": "python scripts/test_socketless.py --junitxml=tmp/phase12-config-review-tests.xml --tb=short",
+    "full_passed": 580,
+    "coverage": {
+      "covered_lines": 3210,
+      "num_statements": 3253,
+      "percent_covered": 97.67227471767688,
+      "percent_covered_display": "98",
+      "missing_lines": 43,
+      "excluded_lines": 7,
+      "percent_statements_covered": 98.67814325238241,
+      "percent_statements_covered_display": "99",
+      "num_branches": 1086,
+      "num_partial_branches": 46,
+      "covered_branches": 1028,
+      "missing_branches": 58,
+      "percent_branches_covered": 94.65930018416206,
+      "percent_branches_covered_display": "95"
+    },
+    "packaging": "Wheel and sdist built and passed Twine. Extracted wheel missing-config smoke passed using existing virtual environment dependencies.",
+    "boundary": "Python 3.12 Windows socketless verification."
+  }
+}

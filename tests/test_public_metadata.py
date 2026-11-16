@@ -49,7 +49,7 @@ def test_dashboard_uses_capabilities_without_milestones(tmp_path,monkeypatch,cap
     assert cli.main(['dashboard','--json'])==1
 
 
-@pytest.mark.parametrize('filename', ['README.md','README_DEMO.md','CHANGELOG.md','CONTRIBUTING.md','docs/release/v2.0.0b2.md'])
+@pytest.mark.parametrize('filename', ['README.md','README_DEMO.md','CHANGELOG.md','CONTRIBUTING.md','docs/release/v2.0.0b2.md','docs/TERMINAL_GUIDE.md'])
 def test_public_documentation_keeps_internal_milestones_out(filename):
     text=Path(filename).read_text(encoding='utf-8')
     assert not re.search(r'\bphases?\b',text,re.I)

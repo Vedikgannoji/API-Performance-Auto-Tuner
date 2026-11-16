@@ -14,13 +14,6 @@ from urllib.parse import urlsplit
 import urllib.request
 import urllib.error
 
-from pydantic import ValidationError
-
-from .product_config import ProductConfig
-from .session import ControlSession
-from .storage import config_identity, connect_readonly, history, report
-from .reporting import serialize_report
-from .scenarios import load_scenario
 from ._version import __version__
 
 VERSION = __version__
@@ -28,6 +21,10 @@ VERSION = __version__
 
 class ControlError(OSError):
     """A sanitized and actionable local-control diagnostic."""
+
+
+class MissingConfiguration(ValueError):
+    """The selected configuration file does not exist."""
 
 
 @contextmanager
@@ -55,7 +52,13 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 def parser():
     root = argparse.ArgumentParser(prog='autotuner', description='Local API proxy with opt-in static and adaptive caching; observe by default.')
     root.add_argument('--version', action='version', version='autotuner ' + VERSION)
-    commands = root.add_subparsers(dest='command', required=True)
+    root.add_argument('--no-input',action='store_true',help='Disable interactive prompts')
+    commands = root.add_subparsers(dest='command')
+    menu=commands.add_parser('menu',help='Open the keyboard-operated terminal workspace')
+    menu.add_argument('--project',default='.',help='Project directory; no discovery or startup on entry')
+    menu.add_argument('--config',default=None)
+    menu.add_argument('--json',action='store_true',help='Describe available menu actions without prompting')
+    menu.add_argument('--no-input',action='store_true',default=argparse.SUPPRESS)
     init = commands.add_parser('init', help='Create an observe-mode JSON configuration')
     init.add_argument('--config', default=None)
     init.add_argument('--force', action='store_true')
@@ -128,7 +131,17 @@ def config_path(args):
 
 
 def resolved_config(args):
-    data = json.loads(config_path(args).read_text(encoding='utf-8'))
+    from .product_config import ProductConfig
+    path = config_path(args)
+    try:
+        contents = path.read_text(encoding='utf-8')
+    except FileNotFoundError:
+        raise MissingConfiguration(
+            f'Configuration file not found: {str(path)!r}. '
+            'Create it with autotuner init or select an existing file with --config. '
+            'In the menu, use Setup > Create observe configuration or c to select a config.'
+        ) from None
+    data = json.loads(contents)
     if not isinstance(data, dict):
         raise ValueError('Configuration must be a JSON object')
     for name in ('upstream', 'listen', 'mode'):
@@ -170,7 +183,24 @@ def local_json(config,method,path,payload=None):
 
 
 def main(argv=None):
-    args = parser().parse_args(argv)
+    root=parser()
+    args = root.parse_args(argv)
+    if args.command is None:
+        if args.no_input or not (sys.stdin.isatty() and sys.stdout.isatty()):
+            root.print_help()
+            return 0
+        from .terminal import run
+        return run(invoke=main)
+    if args.command=='menu':
+        from .terminal import run
+        return run(invoke=main,project=args.project,config=args.config,as_json=args.json,no_input=args.no_input)
+    # Help, version and menu entry do not import the proxy, database or HTTP client.
+    from pydantic import ValidationError
+    from .product_config import ProductConfig
+    from .session import ControlSession
+    from .storage import config_identity, connect_readonly, history, report
+    from .reporting import serialize_report
+    from .scenarios import load_scenario
     try:
         if args.command=='demo':
             from .demo import DemoAPI
@@ -375,6 +405,9 @@ def main(argv=None):
     except ValidationError as exc:
         locations = ['.'.join(map(str, item['loc'])) or 'configuration' for item in exc.errors(include_input=False)]
         print('Invalid configuration fields: ' + ', '.join(locations), file=sys.stderr)
+        return 2
+    except MissingConfiguration as exc:
+        print(str(exc), file=sys.stderr)
         return 2
     except (ValueError, FileExistsError, FileNotFoundError, UnicodeError):
         print('Invalid configuration or path; check the file, arguments and overwrite option.', file=sys.stderr)

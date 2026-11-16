@@ -1,10 +1,10 @@
 # API Performance Auto Tuner
 
-Local API monitoring, performance insights and adaptive response caching. **Autotuner v2.0.0-beta.2 is a preview release; full performance qualification and package-registry publication remain pending.**
+Local API monitoring, performance insights and adaptive response caching. **The current development snapshot is 2.1.0.dev0. Full performance qualification and package-registry publication remain pending.**
 
 Observe latency, throughput, errors and queueing. Opt into fixed or adaptive response caching with route rules and dependent-write invalidation. Inspect policy decisions, execute ordered API scenarios and export bounded persistent telemetry.
 
-Configure your upstream API, inspect its performance and enable approved cache policies. Project API discovery, interactive terminal menus and a guided optimization lifecycle are planned. See the [release notes](docs/release/v2.0.0b2.md).
+Configure your upstream API, inspect its performance and enable approved cache policies. The keyboard-operated terminal workspace is available now. Project API discovery, guided optimization and live terminal comparisons are planned. See the [preview release notes](docs/release/v2.0.0b2.md).
 
 ## Install from source
 
@@ -21,6 +21,12 @@ autotuner --version
 For a built wheel, use `python -m pip install path-to-wheel.whl` in a virtual environment, or `pipx install path-to-wheel.whl` for an isolated CLI. uv is optional. Registry availability and publisher ownership are not yet verified; do not install a similarly named registry package assuming it is ours.
 
 ## Try it in three terminals
+
+For keyboard-operated configuration, session insights, cache controls and exports, run `autotuner` in a terminal or `autotuner menu --project .`. Select a number or letter and press Enter. Use **b** to go back, **q** to quit and **h** for help. Opening the workspace stays offline and does not scan or modify your project.
+
+The current menu uses an explicitly selected configuration; it does not discover APIs yet. Start the proxy separately for session actions, as shown below. Browser use is optional. See the [terminal guide](docs/TERMINAL_GUIDE.md).
+
+Scripts can use `autotuner menu --json` to list available actions without prompts. Bare `autotuner` prints help when input or output is redirected; explicit interactive entry requires terminal input and output. Use `autotuner --no-input COMMAND ...` to make non-interactive intent explicit.
 
 Terminal 1 — disposable RAM upstream, resets on restart. Keep running:
 

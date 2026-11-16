@@ -20,6 +20,7 @@ def main():
         def run(*arguments):subprocess.run([str(python),*arguments],cwd=root,check=True,timeout=180)
         run('-m','pip','install',str(wheel))
         run('-I','-m','autotuner','--version')
+        run('-I','-m','autotuner','menu','--project',str(root),'--json')
         run('-I','-m','autotuner','init','--config',str(root/'config.json'),'--json')
         run('-I','-m','autotuner','serve','--config',str(root/'config.json'),'--check','--json')
         run('-I','-m','autotuner','benchmark','--help')
